@@ -1267,7 +1267,7 @@ function renderGameForTrainee(game) {
             <div class="text-2xl font-bold text-center mb-6 text-gray-800 dark:text-white">Cliquez dans l'ordre :</div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="sequence-container">
                 ${shuffledItems.map((item) => `
-                    <div class="sequence-item bg-gradient-to-r from-purple-500 to-pink-600 text-white p-6 rounded-xl text-lg font-bold text-center shadow-lg" onclick="selectSequenceItem(${item.originalIndex})">
+                    <div class="sequence-item bg-gradient-to-r from-purple-500 to-pink-600 text-white p-6 rounded-xl text-lg font-bold text-center shadow-lg" data-original-index="${item.originalIndex}" onclick="selectSequenceItem(${item.originalIndex})">
                         ${item.text}
                     </div>
                 `).join('')}
@@ -1325,26 +1325,48 @@ window.selectAnswer = function(index) {
     selectedAnswer = index;
 }
 
-window.selectSequenceItem = function(index) {
-    if (selectedSequence.includes(index)) {
-        selectedSequence = selectedSequence.filter(i => i !== index);
-        document.querySelectorAll('.sequence-item')[index].classList.remove('selected');
-        const orderNum = document.querySelectorAll('.sequence-item')[index].querySelector('.order-number');
-        if (orderNum) orderNum.remove();
+window.selectSequenceItem = function(originalIndex) {
+    console.log('🔍 Clic sur item:', originalIndex);
+
+    // Vérifier si déjà sélectionné
+    const indexPos = selectedSequence.indexOf(originalIndex);
+
+    if (indexPos !== -1) {
+        // DÉSÉLECTIONNER: retirer du tableau
+        console.log('❌ Désélection', originalIndex);
+        selectedSequence.splice(indexPos, 1);
     } else {
-        selectedSequence.push(index);
-        const item = document.querySelectorAll('.sequence-item')[index];
-        item.classList.add('selected');
-        const orderDiv = document.createElement('div');
-        orderDiv.className = 'order-number';
-        orderDiv.textContent = selectedSequence.length;
-        item.appendChild(orderDiv);
+        // SÉLECTIONNER: ajouter au tableau
+        console.log('✅ Sélection', originalIndex);
+        selectedSequence.push(originalIndex);
     }
 
+    // RAFRAÎCHIR TOUT L'AFFICHAGE
+    document.querySelectorAll('.sequence-item').forEach(el => {
+        const idx = parseInt(el.getAttribute('data-original-index'));
+        const pos = selectedSequence.indexOf(idx);
+
+        // Retirer tout
+        el.classList.remove('selected');
+        const oldNum = el.querySelector('.order-number');
+        if (oldNum) oldNum.remove();
+
+        // Réafficher si sélectionné
+        if (pos !== -1) {
+            el.classList.add('selected');
+            const orderDiv = document.createElement('div');
+            orderDiv.className = 'order-number';
+            orderDiv.textContent = pos + 1;
+            el.appendChild(orderDiv);
+        }
+    });
+
+    // Afficher le texte de l'ordre
     database.ref('sessions/' + sessionId + '/currentGame').once('value', (snapshot) => {
         const game = snapshot.val();
         const selectedItems = selectedSequence.map(i => game.items[i]);
         document.getElementById('selected-sequence-display').textContent = selectedItems.join(' → ') || 'Aucune sélection';
+        console.log('📝 Ordre:', selectedSequence);
     });
 }
 
