@@ -425,8 +425,24 @@ let selectedSequence = [];
 let selectedMatching = [];
 let openedBoxes = [];
 let answersListener = null;
+let allActiveListeners = []; // Tracker tous les listeners actifs
 
 const SUPERVISOR_PASSWORD = "sst2025";
+
+// Nettoyer TOUS les listeners Firebase actifs
+function cleanupAllListeners() {
+    console.log('🧹 Nettoyage de tous les listeners...');
+    if (answersListener) {
+        database.ref('sessions/' + sessionId + '/answersCount').off('value', answersListener);
+        answersListener = null;
+    }
+    // Nettoyer tous les listeners trackés
+    allActiveListeners.forEach(ref => {
+        ref.off();
+    });
+    allActiveListeners = [];
+    console.log('✅ Tous les listeners nettoyés');
+}
 
 // Initialiser Firebase
 try {
@@ -637,14 +653,21 @@ function updateTeamsList(teams) {
     const teamsArray = Object.entries(teams);
     teamsCount.textContent = teamsArray.length;
 
-    teamsList.innerHTML = teamsArray.map(([id, team]) => `
+    teamsList.innerHTML = teamsArray.map(([id, team]) => {
+        // DEBUG: Afficher les données de l'équipe
+        console.log('🔍 Équipe:', id, 'Données:', team);
+        const teamName = (team && team.name) ? team.name : 'undefined';
+        const teamScore = (team && team.score) ? team.score : 0;
+
+        return `
         <div class="bg-white dark:bg-gray-700 p-4 rounded-lg shadow-lg text-center relative">
             <button onclick="removeTeam('${id}')" class="absolute top-2 right-2 w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-full font-bold text-sm shadow-lg transition-all">✕</button>
             <div class="text-3xl mb-2">${getTeamEmoji(id)}</div>
-            <div class="text-lg font-bold text-gray-800 dark:text-white">${team && team.name ? team.name : 'Équipe inconnue'}</div>
-            <div class="text-sm text-gray-600 dark:text-gray-400">Score: ${team && team.score ? team.score : 0} pts</div>
+            <div class="text-lg font-bold text-gray-800 dark:text-white">${teamName}</div>
+            <div class="text-sm text-gray-600 dark:text-gray-400">Score: ${teamScore} pts</div>
         </div>
-    `).join('');
+    `;
+    }).join('');
 }
 
 window.removeTeam = function(teamId) {
@@ -702,11 +725,8 @@ window.openBox = function(boxIndex) {
 function loadGame() {
     console.log('🔄 Question', currentGameIndex);
 
-    // Nettoyer le listener
-    if (answersListener) {
-        database.ref('sessions/' + sessionId + '/answersCount').off('value', answersListener);
-        answersListener = null;
-    }
+    // Nettoyer TOUS les listeners pour éviter l'accumulation
+    cleanupAllListeners();
 
     // Charger la question
     database.ref('sessions/' + sessionId + '/randomizedGames').once('value', (snapshot) => {
@@ -1116,7 +1136,12 @@ function showTraineeGame(game) {
     selectedSequence = [];
     selectedMatching = [];
 
-    document.getElementById('trainee-validate-btn').onclick = () => validateTraineeAnswer(game);
+    // Réactiver le bouton pour la nouvelle question
+    const btn = document.getElementById('trainee-validate-btn');
+    btn.disabled = false;
+    btn.textContent = '✓ Valider ma réponse';
+    btn.classList.remove('opacity-50', 'cursor-not-allowed');
+    btn.onclick = () => validateTraineeAnswer(game);
 }
 
 function renderGameForTrainee(game) {
@@ -1234,6 +1259,13 @@ window.selectMatchingItem = function(side, index) {
 }
 
 function validateTraineeAnswer(game) {
+    // Désactiver le bouton pour éviter les double-clics
+    const btn = document.getElementById('trainee-validate-btn');
+    if (btn.disabled) return; // Déjà validé
+    btn.disabled = true;
+    btn.textContent = '⏳ Envoi en cours...';
+    btn.classList.add('opacity-50', 'cursor-not-allowed');
+
     let answer = null;
     let isCorrect = false;
 
@@ -1256,20 +1288,28 @@ function validateTraineeAnswer(game) {
         isCorrect = (matchedPairs.length === game.pairs.length * 2);
     }
 
-    // Sauvegarder la réponse
-    database.ref('sessions/' + sessionId + '/teams/' + teamId).update({
-        hasAnswered: true,
-        answer: answer,
-        isCorrect: isCorrect
-    }).then(() => {
-        // Incrémenter le compteur de réponses
-        const countRef = database.ref('sessions/' + sessionId + '/answersCount');
-        return countRef.transaction((currentCount) => {
-            return (currentCount || 0) + 1;
+    // Vérifier si l'équipe a déjà répondu
+    database.ref('sessions/' + sessionId + '/teams/' + teamId + '/hasAnswered').once('value', (snapshot) => {
+        if (snapshot.val() === true) {
+            console.log('⚠️ Réponse déjà envoyée, annulation');
+            return;
+        }
+
+        // Sauvegarder la réponse
+        database.ref('sessions/' + sessionId + '/teams/' + teamId).update({
+            hasAnswered: true,
+            answer: answer,
+            isCorrect: isCorrect
+        }).then(() => {
+            // Incrémenter le compteur de réponses UNE SEULE FOIS
+            const countRef = database.ref('sessions/' + sessionId + '/answersCount');
+            return countRef.transaction((currentCount) => {
+                return (currentCount || 0) + 1;
+            });
+        }).then(() => {
+            console.log('✅ Réponse envoyée!');
+            showScreen('trainee-waiting-others');
         });
-    }).then(() => {
-        console.log('✅ Réponse envoyée!');
-        showScreen('trainee-waiting-others');
     });
 }
 
