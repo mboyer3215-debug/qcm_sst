@@ -295,6 +295,15 @@
                     <h2 class="text-3xl md:text-4xl font-bold text-primary mb-4" id="projector-question-text">Question...</h2>
                 </div>
                 <div id="projector-game-container" class="mb-6"></div>
+
+                <!-- Timer 30 secondes -->
+                <div class="text-center mb-6">
+                    <div class="inline-block bg-gradient-to-r from-red-500 to-orange-500 text-white px-12 py-6 rounded-2xl shadow-2xl">
+                        <div class="text-6xl font-bold" id="timer-display">30</div>
+                        <div class="text-xl font-semibold mt-2">secondes</div>
+                    </div>
+                </div>
+
                 <div class="text-center">
                     <div class="inline-block bg-white dark:bg-gray-800 px-8 py-4 rounded-2xl shadow-lg">
                         <div class="text-2xl font-bold text-primary"><span id="answered-count">0</span> / <span id="total-teams-count">0</span> équipes ont répondu</div>
@@ -426,8 +435,11 @@ let selectedMatching = [];
 let openedBoxes = [];
 let answersListener = null;
 let allActiveListeners = []; // Tracker tous les listeners actifs
+let timerInterval = null;
+let timeRemaining = 30;
 
 const SUPERVISOR_PASSWORD = "sst2025";
+const QUESTION_TIME_LIMIT = 30; // 30 secondes par question
 
 // Nettoyer TOUS les listeners Firebase actifs
 function cleanupAllListeners() {
@@ -436,12 +448,87 @@ function cleanupAllListeners() {
         database.ref('sessions/' + sessionId + '/answersCount').off('value', answersListener);
         answersListener = null;
     }
+    // Nettoyer le timer
+    if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+    }
     // Nettoyer tous les listeners trackés
     allActiveListeners.forEach(ref => {
         ref.off();
     });
     allActiveListeners = [];
     console.log('✅ Tous les listeners nettoyés');
+}
+
+// Démarrer le timer de 30 secondes
+function startQuestionTimer() {
+    timeRemaining = QUESTION_TIME_LIMIT;
+    document.getElementById('timer-display').textContent = timeRemaining;
+    document.getElementById('timer-display').style.color = 'white';
+
+    timerInterval = setInterval(() => {
+        timeRemaining--;
+        document.getElementById('timer-display').textContent = timeRemaining;
+
+        // Changer la couleur selon le temps restant
+        if (timeRemaining <= 5) {
+            document.getElementById('timer-display').style.color = '#FF0000';
+            document.getElementById('timer-display').classList.add('pulse-anim');
+        } else if (timeRemaining <= 10) {
+            document.getElementById('timer-display').style.color = '#FFA500';
+        }
+
+        // Temps écoulé
+        if (timeRemaining <= 0) {
+            clearInterval(timerInterval);
+            timerInterval = null;
+            handleTimeUp();
+        }
+    }, 1000);
+}
+
+// Quand le temps est écoulé
+function handleTimeUp() {
+    console.log('⏰ Temps écoulé!');
+
+    // Jouer le son de klaxon
+    playHornSound();
+
+    // Marquer les non-répondants comme faux
+    database.ref('sessions/' + sessionId + '/teams').once('value', (snapshot) => {
+        const teams = snapshot.val();
+        if (!teams) return;
+
+        const updates = {};
+        let nonRespondantsCount = 0;
+
+        Object.entries(teams).forEach(([id, team]) => {
+            if (!team.hasAnswered) {
+                updates['sessions/' + sessionId + '/teams/' + id + '/hasAnswered'] = true;
+                updates['sessions/' + sessionId + '/teams/' + id + '/answer'] = null;
+                updates['sessions/' + sessionId + '/teams/' + id + '/isCorrect'] = false;
+                nonRespondantsCount++;
+            }
+        });
+
+        // Mettre à jour Firebase
+        if (Object.keys(updates).length > 0) {
+            database.ref().update(updates).then(() => {
+                // Incrémenter le compteur pour les non-répondants
+                const countRef = database.ref('sessions/' + sessionId + '/answersCount');
+                countRef.transaction((currentCount) => {
+                    return (currentCount || 0) + nonRespondantsCount;
+                });
+            });
+        }
+    });
+}
+
+// Jouer le son de klaxon
+function playHornSound() {
+    const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hZFQlMouLvuWgiCTGH0fPTgjMGHm7A7+OZUQ0PVKzn77NgGAg+ltry0XwpBSp+zO/ajEIJE2C18NBuJAIygdLy0n0qBSp+zO/bfSkFKoLS8tJ9KgUqftLv2n0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2X0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2n0pBSqB0vLSfSkFKoLS8tJ9KgUqftLv2X0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2n0pBSqC0vLRfSoFKoLS8tJ9KgUqftLv2n0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2n0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2X0qBSqC0vLSfSkFKoLS8tJ9KgUqftLv2n0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2X0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2n0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2X0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2n0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2X0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2n0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2X0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2n0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv');
+    audio.play().catch(e => console.log('Son non joué:', e));
 }
 
 // Initialiser Firebase
@@ -806,6 +893,9 @@ function showProjectorQuestion(game) {
 
     const container = document.getElementById('projector-game-container');
     container.innerHTML = renderGameForProjector(game);
+
+    // Démarrer le timer de 30 secondes
+    startQuestionTimer();
 
     // Le listener est activé dans loadGame() après réinitialisation du compteur
 }
