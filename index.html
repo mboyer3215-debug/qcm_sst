@@ -1249,7 +1249,7 @@ function renderGameForTrainee(game) {
             <div class="text-2xl font-bold text-center mb-6 text-gray-800 dark:text-white">Choisissez votre réponse :</div>
             <div class="grid grid-cols-1 gap-4">
                 ${shuffledOptions.map((item, displayIndex) => `
-                    <div class="answer-option bg-white dark:bg-gray-700 p-6 rounded-xl text-xl font-bold text-center shadow-lg" onclick="selectAnswer(${item.originalIndex})">
+                    <div class="answer-option bg-white dark:bg-gray-700 p-6 rounded-xl text-xl font-bold text-center shadow-lg" data-original-index="${item.originalIndex}" onclick="selectAnswer(${item.originalIndex})">
                         ${String.fromCharCode(65 + displayIndex)}. ${item.text}
                     </div>
                 `).join('')}
@@ -1319,10 +1319,19 @@ function renderGameForTrainee(game) {
     }
 }
 
-window.selectAnswer = function(index) {
+window.selectAnswer = function(originalIndex) {
+    console.log('🔍 Clic sur réponse:', originalIndex);
+
+    // Retirer la sélection de toutes les options
     document.querySelectorAll('.answer-option').forEach(opt => opt.classList.remove('selected'));
-    document.querySelectorAll('.answer-option')[index].classList.add('selected');
-    selectedAnswer = index;
+
+    // Trouver et sélectionner l'option avec le bon data-original-index
+    const option = document.querySelector(`.answer-option[data-original-index="${originalIndex}"]`);
+    if (option) {
+        option.classList.add('selected');
+        selectedAnswer = originalIndex;
+        console.log('✅ Réponse sélectionnée:', originalIndex);
+    }
 }
 
 window.selectSequenceItem = function(originalIndex) {
