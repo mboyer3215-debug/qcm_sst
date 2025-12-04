@@ -1287,14 +1287,12 @@ function showTraineeResult() {
             document.getElementById('trainee-result-title').className = 'text-5xl md:text-6xl font-bold mb-6 text-red-600';
         }
 
-        document.getElementById('trainee-points-earned').textContent = points > 0 ? '+' + points : '0';
+            document.getElementById('trainee-points-earned').textContent = points > 0 ? '+' + points : '0';
         document.getElementById('trainee-total-score').textContent = (team.score || 0) + ' pts';
     });
 
-    setTimeout(() => {
-        showScreen('ranking-screen');
-        displayRanking('ranking-list');
-    }, 4000);
+    // Ne pas passer automatiquement au classement
+    // Le listener gameStatus s'occupera de passer à la prochaine question ou au classement
 }
 
 document.getElementById('reset-game-btn').addEventListener('click', () => {
