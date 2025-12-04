@@ -424,6 +424,7 @@ let selectedAnswer = null;
 let selectedSequence = [];
 let selectedMatching = [];
 let openedBoxes = [];
+let answersListener = null;
 
 const SUPERVISOR_PASSWORD = "sst2025";
 
@@ -639,8 +640,8 @@ function updateTeamsList(teams) {
     teamsList.innerHTML = teamsArray.map(([id, team]) => `
         <div class="bg-white dark:bg-gray-700 p-4 rounded-lg shadow-lg text-center">
             <div class="text-3xl mb-2">${getTeamEmoji(id)}</div>
-            <div class="text-lg font-bold text-gray-800 dark:text-white">${team.name}</div>
-            <div class="text-sm text-gray-600 dark:text-gray-400">Score: ${team.score || 0} pts</div>
+            <div class="text-lg font-bold text-gray-800 dark:text-white">${team && team.name ? team.name : 'Équipe inconnue'}</div>
+            <div class="text-sm text-gray-600 dark:text-gray-400">Score: ${team && team.score ? team.score : 0} pts</div>
         </div>
     `).join('');
 }
@@ -692,28 +693,42 @@ window.openBox = function(boxIndex) {
 }
 
 function loadGame() {
-    database.ref('sessions/' + sessionId + '/randomizedGames').once('value', (snapshot) => {
-        const games = snapshot.val();
-        if (!games || !games[currentGameIndex]) return;
+    // D'abord mettre le gameStatus à "loading" pour éviter les faux déclenchements
+    database.ref('sessions/' + sessionId + '/gameStatus').set('loading').then(() => {
+        database.ref('sessions/' + sessionId + '/randomizedGames').once('value', (snapshot) => {
+            const games = snapshot.val();
+            if (!games || !games[currentGameIndex]) return;
 
-        const game = games[currentGameIndex];
-        showProjectorQuestion(game);
-        database.ref('sessions/' + sessionId + '/currentGame').set(game);
-        resetAnswersFlags();
+            const game = games[currentGameIndex];
+            showProjectorQuestion(game);
+
+            // Réinitialiser les réponses AVANT de charger la question
+            resetAnswersFlags().then(() => {
+                // Définir currentGame et gameStatus EN MÊME TEMPS
+                database.ref('sessions/' + sessionId).update({
+                    currentGame: game,
+                    currentGameIndex: currentGameIndex,
+                    gameStatus: 'question',
+                    questionTimestamp: Date.now() // Force le changement à chaque question
+                });
+            });
+        });
     });
 }
 
 function resetAnswersFlags() {
-    database.ref('sessions/' + sessionId + '/teams').once('value', (snapshot) => {
+    return database.ref('sessions/' + sessionId + '/teams').once('value').then((snapshot) => {
         const teams = snapshot.val();
-        if (!teams) return;
+        if (!teams) return Promise.resolve();
+
+        const updates = {};
         Object.keys(teams).forEach(id => {
-            database.ref('sessions/' + sessionId + '/teams/' + id).update({
-                hasAnswered: false,
-                answer: null,
-                isCorrect: false
-            });
+            updates['sessions/' + sessionId + '/teams/' + id + '/hasAnswered'] = false;
+            updates['sessions/' + sessionId + '/teams/' + id + '/answer'] = null;
+            updates['sessions/' + sessionId + '/teams/' + id + '/isCorrect'] = false;
         });
+
+        return database.ref().update(updates);
     });
 }
 
@@ -777,7 +792,13 @@ function renderGameForProjector(game) {
 }
 
 function listenForAnswers() {
-    database.ref('sessions/' + sessionId + '/teams').on('value', (snapshot) => {
+    // Nettoyer l'ancien listener s'il existe
+    if (answersListener) {
+        database.ref('sessions/' + sessionId + '/teams').off('value', answersListener);
+    }
+
+    // Créer un nouveau listener
+    answersListener = (snapshot) => {
         const teams = snapshot.val();
         if (!teams) return;
 
@@ -788,9 +809,14 @@ function listenForAnswers() {
         document.getElementById('total-teams-count').textContent = teamsArray.length;
 
         if (answeredTeams === teamsArray.length && answeredTeams > 0) {
+            // Nettoyer le listener avant de passer à la correction
+            database.ref('sessions/' + sessionId + '/teams').off('value', answersListener);
+            answersListener = null;
             setTimeout(() => showCorrection(), 1500);
         }
-    });
+    };
+
+    database.ref('sessions/' + sessionId + '/teams').on('value', answersListener);
 }
 
 function showCorrection() {
@@ -906,8 +932,8 @@ function displayRanking(containerId) {
 
         const teamsArray = Object.entries(teams).map(([id, team]) => ({
             id,
-            name: team.name,
-            score: team.score || 0
+            name: team && team.name ? team.name : 'Équipe inconnue',
+            score: team && team.score ? team.score : 0
         })).sort((a, b) => b.score - a.score);
 
         const container = document.getElementById(containerId);
@@ -933,7 +959,9 @@ function showPodium() {
         if (!teams) return;
 
         const teamsArray = Object.entries(teams).map(([id, team]) => ({
-            id, name: team.name, score: team.score || 0
+            id,
+            name: team && team.name ? team.name : 'Équipe inconnue',
+            score: team && team.score ? team.score : 0
         })).sort((a, b) => b.score - a.score);
 
         const podiumContainer = document.getElementById('podium-container');
