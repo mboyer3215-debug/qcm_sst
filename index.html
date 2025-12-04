@@ -1410,28 +1410,30 @@ function validateTraineeAnswer(game) {
         isCorrect = (matchedPairs.length === game.pairs.length * 2);
     }
 
-    // Vérifier si l'équipe a déjà répondu
-    database.ref('sessions/' + sessionId + '/teams/' + teamId + '/hasAnswered').once('value', (snapshot) => {
-        if (snapshot.val() === true) {
-            console.log('⚠️ Réponse déjà envoyée, annulation');
-            return;
-        }
+    // Sauvegarder la réponse directement (le bouton est déjà désactivé, pas de risque de doublon)
+    console.log('📤 Envoi de la réponse:', { answer, isCorrect });
 
-        // Sauvegarder la réponse
-        database.ref('sessions/' + sessionId + '/teams/' + teamId).update({
-            hasAnswered: true,
-            answer: answer,
-            isCorrect: isCorrect
-        }).then(() => {
-            // Incrémenter le compteur de réponses UNE SEULE FOIS
-            const countRef = database.ref('sessions/' + sessionId + '/answersCount');
-            return countRef.transaction((currentCount) => {
-                return (currentCount || 0) + 1;
-            });
-        }).then(() => {
-            console.log('✅ Réponse envoyée!');
-            showScreen('trainee-waiting-others');
+    database.ref('sessions/' + sessionId + '/teams/' + teamId).update({
+        hasAnswered: true,
+        answer: answer,
+        isCorrect: isCorrect
+    }).then(() => {
+        console.log('✅ Réponse sauvegardée');
+        // Incrémenter le compteur de réponses UNE SEULE FOIS
+        const countRef = database.ref('sessions/' + sessionId + '/answersCount');
+        return countRef.transaction((currentCount) => {
+            return (currentCount || 0) + 1;
         });
+    }).then(() => {
+        console.log('✅ Compteur incrémenté!');
+        showScreen('trainee-waiting-others');
+    }).catch((error) => {
+        console.error('❌ Erreur envoi réponse:', error);
+        // Réactiver le bouton en cas d'erreur
+        btn.disabled = false;
+        btn.textContent = '✓ Valider ma réponse';
+        btn.classList.remove('opacity-50', 'cursor-not-allowed');
+        showCustomAlert('Erreur lors de l\'envoi. Réessayez.');
     });
 }
 
