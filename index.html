@@ -700,26 +700,63 @@ window.openBox = function(boxIndex) {
 }
 
 function loadGame() {
-    // D'abord mettre le gameStatus à "loading" pour éviter les faux déclenchements
-    database.ref('sessions/' + sessionId + '/gameStatus').set('loading').then(() => {
-        database.ref('sessions/' + sessionId + '/randomizedGames').once('value', (snapshot) => {
-            const games = snapshot.val();
-            if (!games || !games[currentGameIndex]) return;
+    console.log('🔄 Question', currentGameIndex);
 
-            const game = games[currentGameIndex];
+    // Nettoyer le listener
+    if (answersListener) {
+        database.ref('sessions/' + sessionId + '/answersCount').off('value', answersListener);
+        answersListener = null;
+    }
+
+    // Charger la question
+    database.ref('sessions/' + sessionId + '/randomizedGames').once('value', (snapshot) => {
+        const games = snapshot.val();
+        if (!games || !games[currentGameIndex]) return;
+
+        const game = games[currentGameIndex];
+
+        // Réinitialiser le compteur à 0 et charger la question
+        database.ref('sessions/' + sessionId).update({
+            answersCount: 0,
+            currentGame: game,
+            currentGameIndex: currentGameIndex,
+            gameStatus: 'question',
+            questionTimestamp: Date.now()
+        }).then(() => {
             showProjectorQuestion(game);
-
-            // Réinitialiser les réponses AVANT de charger la question
-            resetAnswersFlags().then(() => {
-                // Définir currentGame et gameStatus EN MÊME TEMPS
-                database.ref('sessions/' + sessionId).update({
-                    currentGame: game,
-                    currentGameIndex: currentGameIndex,
-                    gameStatus: 'question',
-                    questionTimestamp: Date.now() // Force le changement à chaque question
-                });
-            });
+            startAnswersCountListener();
+            console.log('✅ Question prête!');
         });
+    });
+}
+
+function startAnswersCountListener() {
+    // Compter combien d'équipes il y a
+    database.ref('sessions/' + sessionId + '/teams').once('value', (snapshot) => {
+        const teams = snapshot.val();
+        if (!teams) return;
+
+        const totalTeams = Object.keys(teams).length;
+        console.log('👥 Total équipes:', totalTeams);
+
+        // Écouter le compteur de réponses
+        answersListener = (snapshot) => {
+            const count = snapshot.val() || 0;
+            console.log('📊 Réponses:', count, '/', totalTeams);
+
+            document.getElementById('answered-count').textContent = count;
+            document.getElementById('total-teams-count').textContent = totalTeams;
+
+            // Si tout le monde a répondu
+            if (count === totalTeams && count > 0) {
+                console.log('✅ Tous ont répondu!');
+                database.ref('sessions/' + sessionId + '/answersCount').off('value', answersListener);
+                answersListener = null;
+                setTimeout(() => showCorrection(), 1000);
+            }
+        };
+
+        database.ref('sessions/' + sessionId + '/answersCount').on('value', answersListener);
     });
 }
 
@@ -747,7 +784,7 @@ function showProjectorQuestion(game) {
     const container = document.getElementById('projector-game-container');
     container.innerHTML = renderGameForProjector(game);
 
-    listenForAnswers();
+    // Le listener est activé dans loadGame() après réinitialisation du compteur
 }
 
 function getGameIcon(type) {
@@ -798,33 +835,7 @@ function renderGameForProjector(game) {
     }
 }
 
-function listenForAnswers() {
-    // Nettoyer l'ancien listener s'il existe
-    if (answersListener) {
-        database.ref('sessions/' + sessionId + '/teams').off('value', answersListener);
-    }
-
-    // Créer un nouveau listener
-    answersListener = (snapshot) => {
-        const teams = snapshot.val();
-        if (!teams) return;
-
-        const teamsArray = Object.values(teams);
-        const answeredTeams = teamsArray.filter(t => t.hasAnswered).length;
-
-        document.getElementById('answered-count').textContent = answeredTeams;
-        document.getElementById('total-teams-count').textContent = teamsArray.length;
-
-        if (answeredTeams === teamsArray.length && answeredTeams > 0) {
-            // Nettoyer le listener avant de passer à la correction
-            database.ref('sessions/' + sessionId + '/teams').off('value', answersListener);
-            answersListener = null;
-            setTimeout(() => showCorrection(), 1500);
-        }
-    };
-
-    database.ref('sessions/' + sessionId + '/teams').on('value', answersListener);
-}
+// Cette fonction n'est plus utilisée - remplacée par startAnswersCountListener
 
 function showCorrection() {
     database.ref('sessions/' + sessionId + '/randomizedGames').once('value', (snapshot) => {
@@ -1242,13 +1253,21 @@ function validateTraineeAnswer(game) {
         isCorrect = (matchedPairs.length === game.pairs.length * 2);
     }
 
+    // Sauvegarder la réponse
     database.ref('sessions/' + sessionId + '/teams/' + teamId).update({
         hasAnswered: true,
         answer: answer,
         isCorrect: isCorrect
+    }).then(() => {
+        // Incrémenter le compteur de réponses
+        const countRef = database.ref('sessions/' + sessionId + '/answersCount');
+        return countRef.transaction((currentCount) => {
+            return (currentCount || 0) + 1;
+        });
+    }).then(() => {
+        console.log('✅ Réponse envoyée!');
+        showScreen('trainee-waiting-others');
     });
-
-    showScreen('trainee-waiting-others');
 }
 
 function showTraineeResult() {
