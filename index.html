@@ -724,8 +724,11 @@ function loadGame() {
             questionTimestamp: Date.now()
         }).then(() => {
             showProjectorQuestion(game);
-            startAnswersCountListener();
-            console.log('✅ Question prête!');
+            // ATTENDRE 500ms pour que Firebase propage la réinitialisation du compteur
+            setTimeout(() => {
+                startAnswersCountListener();
+                console.log('✅ Question prête - Listener actif!');
+            }, 500);
         });
     });
 }
@@ -1048,8 +1051,8 @@ document.getElementById('join-game-btn').addEventListener('click', () => {
 
     const teamRef = database.ref('sessions/' + sessionId + '/teams/' + teamId);
 
-    // Utiliser .update() au lieu de .set() pour ne pas écraser les données existantes
-    teamRef.update({
+    // Utiliser .set() pour créer l'équipe (UUID garantit l'unicité)
+    teamRef.set({
         name: teamName,
         score: 0,
         hasAnswered: false,
