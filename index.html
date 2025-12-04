@@ -1146,23 +1146,39 @@ function showTraineeGame(game) {
 
 function renderGameForTrainee(game) {
     if (game.type === 'quiz' || game.type === 'true-false') {
+        // Mélanger les options ET mémoriser les index originaux
+        const shuffledOptions = game.options.map((opt, i) => ({ text: opt, originalIndex: i }));
+
+        // Mélange Fisher-Yates
+        for (let i = shuffledOptions.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffledOptions[i], shuffledOptions[j]] = [shuffledOptions[j], shuffledOptions[i]];
+        }
+
         return `
             <div class="text-2xl font-bold text-center mb-6 text-gray-800 dark:text-white">Choisissez votre réponse :</div>
             <div class="grid grid-cols-1 gap-4">
-                ${game.options.map((opt, i) => `
-                    <div class="answer-option bg-white dark:bg-gray-700 p-6 rounded-xl text-xl font-bold text-center shadow-lg" onclick="selectAnswer(${i})">
-                        ${String.fromCharCode(65 + i)}. ${opt}
+                ${shuffledOptions.map((item, displayIndex) => `
+                    <div class="answer-option bg-white dark:bg-gray-700 p-6 rounded-xl text-xl font-bold text-center shadow-lg" onclick="selectAnswer(${item.originalIndex})">
+                        ${String.fromCharCode(65 + displayIndex)}. ${item.text}
                     </div>
                 `).join('')}
             </div>
         `;
     } else if (game.type === 'sequence') {
+        // Mélanger les items de la séquence
+        const shuffledItems = game.items.map((item, i) => ({ text: item, originalIndex: i }));
+        for (let i = shuffledItems.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffledItems[i], shuffledItems[j]] = [shuffledItems[j], shuffledItems[i]];
+        }
+
         return `
             <div class="text-2xl font-bold text-center mb-6 text-gray-800 dark:text-white">Cliquez dans l'ordre :</div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="sequence-container">
-                ${game.items.map((item, i) => `
-                    <div class="sequence-item bg-gradient-to-r from-purple-500 to-pink-600 text-white p-6 rounded-xl text-lg font-bold text-center shadow-lg" onclick="selectSequenceItem(${i})">
-                        ${item}
+                ${shuffledItems.map((item) => `
+                    <div class="sequence-item bg-gradient-to-r from-purple-500 to-pink-600 text-white p-6 rounded-xl text-lg font-bold text-center shadow-lg" onclick="selectSequenceItem(${item.originalIndex})">
+                        ${item.text}
                     </div>
                 `).join('')}
             </div>
@@ -1172,20 +1188,36 @@ function renderGameForTrainee(game) {
             </div>
         `;
     } else if (game.type === 'matching') {
+        // Mélanger les éléments de gauche et de droite séparément
+        const shuffledLeft = game.pairs.map((pair, i) => ({ text: pair.left, originalIndex: i }));
+        const shuffledRight = game.pairs.map((pair, i) => ({ text: pair.right, originalIndex: i }));
+
+        // Mélanger gauche
+        for (let i = shuffledLeft.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffledLeft[i], shuffledLeft[j]] = [shuffledLeft[j], shuffledLeft[i]];
+        }
+
+        // Mélanger droite
+        for (let i = shuffledRight.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffledRight[i], shuffledRight[j]] = [shuffledRight[j], shuffledRight[i]];
+        }
+
         return `
             <div class="text-2xl font-bold text-center mb-6 text-gray-800 dark:text-white">Associez les paires (cliquez 2 éléments) :</div>
             <div class="grid grid-cols-2 gap-6">
                 <div class="space-y-3" id="matching-left">
-                    ${game.pairs.map((pair, i) => `
-                        <div class="matching-item bg-gradient-to-r from-blue-500 to-cyan-600 text-white p-4 rounded-xl text-lg font-bold text-center shadow-lg" data-side="left" data-index="${i}" onclick="selectMatchingItem('left', ${i})">
-                            ${pair.left}
+                    ${shuffledLeft.map((item) => `
+                        <div class="matching-item bg-gradient-to-r from-blue-500 to-cyan-600 text-white p-4 rounded-xl text-lg font-bold text-center shadow-lg" data-side="left" data-index="${item.originalIndex}" onclick="selectMatchingItem('left', ${item.originalIndex})">
+                            ${item.text}
                         </div>
                     `).join('')}
                 </div>
                 <div class="space-y-3" id="matching-right">
-                    ${game.pairs.map((pair, i) => `
-                        <div class="matching-item bg-gradient-to-r from-purple-500 to-pink-600 text-white p-4 rounded-xl text-lg font-bold text-center shadow-lg" data-side="right" data-index="${i}" onclick="selectMatchingItem('right', ${i})">
-                            ${pair.right}
+                    ${shuffledRight.map((item) => `
+                        <div class="matching-item bg-gradient-to-r from-purple-500 to-pink-600 text-white p-4 rounded-xl text-lg font-bold text-center shadow-lg" data-side="right" data-index="${item.originalIndex}" onclick="selectMatchingItem('right', ${item.originalIndex})">
+                            ${item.text}
                         </div>
                     `).join('')}
                 </div>
