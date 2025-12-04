@@ -638,12 +638,19 @@ function updateTeamsList(teams) {
     teamsCount.textContent = teamsArray.length;
 
     teamsList.innerHTML = teamsArray.map(([id, team]) => `
-        <div class="bg-white dark:bg-gray-700 p-4 rounded-lg shadow-lg text-center">
+        <div class="bg-white dark:bg-gray-700 p-4 rounded-lg shadow-lg text-center relative">
+            <button onclick="removeTeam('${id}')" class="absolute top-2 right-2 w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-full font-bold text-sm shadow-lg transition-all">✕</button>
             <div class="text-3xl mb-2">${getTeamEmoji(id)}</div>
             <div class="text-lg font-bold text-gray-800 dark:text-white">${team && team.name ? team.name : 'Équipe inconnue'}</div>
             <div class="text-sm text-gray-600 dark:text-gray-400">Score: ${team && team.score ? team.score : 0} pts</div>
         </div>
     `).join('');
+}
+
+window.removeTeam = function(teamId) {
+    showConfirmDialog('Voulez-vous vraiment supprimer cette équipe ?', () => {
+        database.ref('sessions/' + sessionId + '/teams/' + teamId).remove();
+    });
 }
 
 document.getElementById('start-game-btn').addEventListener('click', () => {
@@ -890,21 +897,38 @@ function calculateAndUpdateScores(game) {
 
 document.getElementById('next-question-btn').addEventListener('click', () => {
     currentGameIndex++;
+    console.log('📍 Passage à la question:', currentGameIndex);
 
     database.ref('sessions/' + sessionId + '/randomizedGames').once('value', (snapshot) => {
         const games = snapshot.val();
 
+        if (!games) {
+            console.error('❌ Pas de jeux trouvés!');
+            return;
+        }
+
+        console.log('📊 Questions dans ce coffre:', games.length, 'Question actuelle:', currentGameIndex);
+
+        // Vérifier si on a terminé les 5 questions du coffre
         if (currentGameIndex >= games.length) {
-            openedBoxes.push(currentBox);
+            console.log('✅ Coffre terminé! Coffre:', currentBox);
+
+            // Marquer le coffre comme terminé
+            if (!openedBoxes.includes(currentBox)) {
+                openedBoxes.push(currentBox);
+            }
             database.ref('sessions/' + sessionId + '/openedBoxes').set(openedBoxes);
 
+            // Vérifier si c'est le dernier coffre
             if (currentBox < BOXES_DATA.length - 1) {
+                console.log('⏸️ Pause avant coffre suivant');
                 showPauseScreen();
             } else {
+                console.log('🏆 Tous les coffres terminés - Podium!');
                 showPodium();
             }
         } else {
-            database.ref('sessions/' + sessionId + '/currentGameIndex').set(currentGameIndex);
+            console.log('➡️ Question suivante dans le même coffre');
             loadGame();
         }
     });
@@ -1011,21 +1035,33 @@ document.getElementById('join-game-btn').addEventListener('click', () => {
 
     teamId = 'team_' + generateUUID();
 
-    database.ref('sessions/' + sessionId + '/teams/' + teamId).set({
+    const teamRef = database.ref('sessions/' + sessionId + '/teams/' + teamId);
+
+    // Utiliser .update() au lieu de .set() pour ne pas écraser les données existantes
+    teamRef.update({
         name: teamName,
         score: 0,
         hasAnswered: false,
         joinedAt: Date.now()
-    });
+    }).then(() => {
+        console.log('✅ Équipe créée:', teamName, teamId);
 
-    showScreen('trainee-waiting');
-    document.getElementById('trainee-team-name-display').textContent = teamName;
+        // 🔥 IMPORTANT: Supprimer automatiquement l'équipe si le stagiaire se déconnecte
+        teamRef.onDisconnect().remove();
+        console.log('🔌 Listener de déconnexion activé pour:', teamName);
 
-    database.ref('sessions/' + sessionId + '/status').on('value', (snapshot) => {
-        const status = snapshot.val();
-        if (status === 'playing') {
-            listenForGameUpdatesTrainee();
-        }
+        showScreen('trainee-waiting');
+        document.getElementById('trainee-team-name-display').textContent = teamName;
+
+        database.ref('sessions/' + sessionId + '/status').on('value', (snapshot) => {
+            const status = snapshot.val();
+            if (status === 'playing') {
+                listenForGameUpdatesTrainee();
+            }
+        });
+    }).catch((error) => {
+        console.error('❌ Erreur création équipe:', error);
+        showCustomAlert('Erreur lors de la connexion. Réessayez.');
     });
 });
 
