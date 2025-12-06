@@ -178,6 +178,19 @@
         .rank-2 { background: linear-gradient(135deg, #C0C0C0 0%, #808080 100%); }
         .rank-3 { background: linear-gradient(135deg, #CD7F32 0%, #8B4513 100%); }
         .rank-other { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); }
+
+        /* Prévention du scroll pour les stagiaires connectés */
+        body.trainee-connected {
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+        }
+
+        body.trainee-connected #app {
+            overflow-y: auto;
+            height: 100vh;
+        }
     </style>
     <script>
         tailwind.config = {
@@ -441,6 +454,92 @@ let timeRemaining = 30;
 const SUPERVISOR_PASSWORD = "sst2025";
 const QUESTION_TIME_LIMIT = 30; // 30 secondes par question
 
+// === GESTION PERSISTANCE SESSION (via URL) ===
+// Sauvegarder la session en mettant à jour l'URL
+function saveTraineeSessionToURL() {
+    if (userRole === 'trainee' && teamId && sessionId) {
+        const url = new URL(window.location.href);
+        url.searchParams.set('session', sessionId);
+        url.searchParams.set('team', teamId);
+        window.history.replaceState({}, '', url.toString());
+        console.log('💾 Session sauvegardée dans URL:', { sessionId, teamId });
+    }
+}
+
+// Vérifier si une équipe existe dans Firebase
+function checkTeamExists(sessionId, teamId) {
+    return database.ref('sessions/' + sessionId + '/teams/' + teamId).once('value').then(snapshot => {
+        return snapshot.exists() ? snapshot.val() : null;
+    });
+}
+
+// Reconnecter à une session existante
+function reconnectToSession(sessionId, teamId, teamData) {
+    console.log('🔄 Reconnexion à la session:', { sessionId, teamId, teamName: teamData.name });
+
+    userRole = 'trainee';
+    teamName = teamData.name;
+
+    // Activer la protection anti-scroll
+    enableTraineeScrollProtection();
+
+    // Réactiver le listener de déconnexion
+    const teamRef = database.ref('sessions/' + sessionId + '/teams/' + teamId);
+    teamRef.onDisconnect().remove();
+    console.log('🔌 Listener de déconnexion réactivé pour:', teamName);
+
+    // Vérifier le statut de la session
+    database.ref('sessions/' + sessionId + '/status').once('value', (snapshot) => {
+        const status = snapshot.val();
+
+        if (!status) {
+            // Session n'existe pas ou plus
+            showCustomAlert('Cette session n\'existe plus. Veuillez rejoindre une nouvelle session.');
+            clearSessionFromURL();
+            disableTraineeScrollProtection();
+            showScreen('trainee-login');
+            return;
+        }
+
+        if (status === 'waiting') {
+            // En attente de démarrage
+            showScreen('trainee-waiting');
+            document.getElementById('trainee-team-name-display').textContent = teamName;
+
+            // Écouter le démarrage
+            database.ref('sessions/' + sessionId + '/status').on('value', (snapshot) => {
+                const newStatus = snapshot.val();
+                if (newStatus === 'playing') {
+                    listenForGameUpdatesTrainee();
+                }
+            });
+        } else if (status === 'playing') {
+            // Jeu en cours - rejoindre directement
+            listenForGameUpdatesTrainee();
+        }
+    });
+}
+
+// Effacer la session de l'URL
+function clearSessionFromURL() {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('team');
+    window.history.replaceState({}, '', url.toString());
+    console.log('🗑️ Session effacée de l\'URL');
+}
+
+// Activer la protection anti-scroll pour les stagiaires
+function enableTraineeScrollProtection() {
+    document.body.classList.add('trainee-connected');
+    console.log('🔒 Protection scroll activée');
+}
+
+// Désactiver la protection anti-scroll
+function disableTraineeScrollProtection() {
+    document.body.classList.remove('trainee-connected');
+    console.log('🔓 Protection scroll désactivée');
+}
+
 // Nettoyer TOUS les listeners Firebase actifs
 function cleanupAllListeners() {
     console.log('🧹 Nettoyage de tous les listeners...');
@@ -502,6 +601,7 @@ function handleTimeUp() {
 
         const updates = {};
         let nonRespondantsCount = 0;
+        const totalTeams = Object.keys(teams).length;
 
         Object.entries(teams).forEach(([id, team]) => {
             if (!team.hasAnswered) {
@@ -512,6 +612,8 @@ function handleTimeUp() {
             }
         });
 
+        console.log('📊 Fin timer - Non-répondants:', nonRespondantsCount, '/ Total:', totalTeams);
+
         // Mettre à jour Firebase
         if (Object.keys(updates).length > 0) {
             database.ref().update(updates).then(() => {
@@ -519,9 +621,46 @@ function handleTimeUp() {
                 const countRef = database.ref('sessions/' + sessionId + '/answersCount');
                 countRef.transaction((currentCount) => {
                     return (currentCount || 0) + nonRespondantsCount;
+                }).then(() => {
+                    // Après mise à jour, vérifier si tout le monde a répondu
+                    checkIfAllAnswered();
                 });
             });
+        } else {
+            // Tout le monde a déjà répondu avant la fin du timer
+            console.log('✅ Tout le monde avait déjà répondu - passage à la correction');
+            // Nettoyer le listener et passer directement à la correction
+            if (answersListener) {
+                database.ref('sessions/' + sessionId + '/answersCount').off('value', answersListener);
+                answersListener = null;
+            }
+            setTimeout(() => showCorrection(), 1000);
         }
+    });
+}
+
+// Vérifier si toutes les équipes ont répondu
+function checkIfAllAnswered() {
+    database.ref('sessions/' + sessionId + '/teams').once('value', (teamsSnapshot) => {
+        const teams = teamsSnapshot.val();
+        if (!teams) return;
+
+        const totalTeams = Object.keys(teams).length;
+
+        database.ref('sessions/' + sessionId + '/answersCount').once('value', (countSnapshot) => {
+            const count = countSnapshot.val() || 0;
+            console.log('🔍 Vérification réponses:', count, '/', totalTeams);
+
+            if (count >= totalTeams && totalTeams > 0) {
+                console.log('✅ Tous ont répondu après timeout - passage correction');
+                // Nettoyer le listener
+                if (answersListener) {
+                    database.ref('sessions/' + sessionId + '/answersCount').off('value', answersListener);
+                    answersListener = null;
+                }
+                setTimeout(() => showCorrection(), 1000);
+            }
+        });
     });
 }
 
@@ -1137,15 +1276,41 @@ function showPodium() {
     });
 }
 
-// Connexion Stagiaire
+// Connexion Stagiaire - avec auto-reconnexion
 window.addEventListener('DOMContentLoaded', () => {
     const urlParams = new URLSearchParams(window.location.search);
     const sessionParam = urlParams.get('session');
+    const teamParam = urlParams.get('team');
 
     if (sessionParam) {
         sessionId = sessionParam;
-        userRole = 'trainee';
-        showScreen('trainee-login');
+
+        // Tentative de reconnexion si teamId dans l'URL
+        if (teamParam) {
+            console.log('🔍 Tentative de reconnexion...', { sessionId: sessionParam, teamId: teamParam });
+
+            checkTeamExists(sessionParam, teamParam).then(teamData => {
+                if (teamData) {
+                    // L'équipe existe encore dans Firebase - reconnecter
+                    teamId = teamParam;
+                    reconnectToSession(sessionParam, teamParam, teamData);
+                } else {
+                    // L'équipe n'existe plus - afficher login
+                    console.log('❌ Équipe inexistante, affichage login');
+                    clearSessionFromURL();
+                    userRole = 'trainee';
+                    showScreen('trainee-login');
+                }
+            }).catch(error => {
+                console.error('❌ Erreur reconnexion:', error);
+                userRole = 'trainee';
+                showScreen('trainee-login');
+            });
+        } else {
+            // Pas de teamId - nouvelle connexion
+            userRole = 'trainee';
+            showScreen('trainee-login');
+        }
     }
 });
 
@@ -1173,6 +1338,12 @@ document.getElementById('join-game-btn').addEventListener('click', () => {
         // 🔥 IMPORTANT: Supprimer automatiquement l'équipe si le stagiaire se déconnecte
         teamRef.onDisconnect().remove();
         console.log('🔌 Listener de déconnexion activé pour:', teamName);
+
+        // 💾 Sauvegarder la session dans l'URL pour permettre la reconnexion
+        saveTraineeSessionToURL();
+
+        // 🔒 Activer la protection anti-scroll
+        enableTraineeScrollProtection();
 
         showScreen('trainee-waiting');
         document.getElementById('trainee-team-name-display').textContent = teamName;
