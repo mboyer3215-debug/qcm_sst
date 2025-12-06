@@ -181,15 +181,24 @@
 
         /* Prévention du scroll pour les stagiaires connectés */
         body.trainee-connected {
-            overflow: hidden;
-            position: fixed;
-            width: 100%;
-            height: 100%;
+            overflow: hidden !important;
+            position: fixed !important;
+            width: 100% !important;
+            height: 100% !important;
+            top: 0 !important;
+            left: 0 !important;
         }
 
         body.trainee-connected #app {
-            overflow-y: auto;
-            height: 100vh;
+            overflow-y: auto !important;
+            height: 100vh !important;
+            width: 100% !important;
+            position: relative !important;
+        }
+
+        /* Cacher l'écran de login une fois connecté */
+        body.trainee-connected #trainee-login {
+            display: none !important;
         }
     </style>
     <script>
@@ -532,6 +541,18 @@ function clearSessionFromURL() {
 function enableTraineeScrollProtection() {
     document.body.classList.add('trainee-connected');
     console.log('🔒 Protection scroll activée');
+    console.log('📍 Classes du body:', document.body.className);
+
+    // Vérifier toutes les 2 secondes que la protection est toujours active
+    const checkInterval = setInterval(() => {
+        if (!document.body.classList.contains('trainee-connected')) {
+            console.warn('⚠️ Protection scroll perdue - réactivation');
+            document.body.classList.add('trainee-connected');
+        }
+    }, 2000);
+
+    // Stocker l'interval pour pouvoir l'arrêter plus tard si besoin
+    window.scrollProtectionInterval = checkInterval;
 }
 
 // Désactiver la protection anti-scroll
@@ -961,13 +982,18 @@ function loadGame() {
 
         const game = games[currentGameIndex];
 
-        // Réinitialiser le compteur à 0 et charger la question
-        database.ref('sessions/' + sessionId).update({
-            answersCount: 0,
-            currentGame: game,
-            currentGameIndex: currentGameIndex,
-            gameStatus: 'question',
-            questionTimestamp: Date.now()
+        // 🔥 IMPORTANT: Réinitialiser les flags de réponse pour CHAQUE question
+        resetAnswersFlags().then(() => {
+            console.log('✅ Flags hasAnswered réinitialisés');
+
+            // Réinitialiser le compteur à 0 et charger la question
+            return database.ref('sessions/' + sessionId).update({
+                answersCount: 0,
+                currentGame: game,
+                currentGameIndex: currentGameIndex,
+                gameStatus: 'question',
+                questionTimestamp: Date.now()
+            });
         }).then(() => {
             showProjectorQuestion(game);
             // ATTENDRE 500ms pour que Firebase propage la réinitialisation du compteur
@@ -1019,8 +1045,10 @@ function resetAnswersFlags() {
             updates['sessions/' + sessionId + '/teams/' + id + '/hasAnswered'] = false;
             updates['sessions/' + sessionId + '/teams/' + id + '/answer'] = null;
             updates['sessions/' + sessionId + '/teams/' + id + '/isCorrect'] = false;
+            updates['sessions/' + sessionId + '/teams/' + id + '/lastPoints'] = 0; // Réinitialiser aussi les points
         });
 
+        console.log('🔄 Réinitialisation des flags pour', Object.keys(teams).length, 'équipes');
         return database.ref().update(updates);
     });
 }
@@ -1644,19 +1672,39 @@ function showTraineeResult() {
 
     database.ref('sessions/' + sessionId + '/teams/' + teamId).once('value', (snapshot) => {
         const team = snapshot.val();
-        const points = team.lastPoints || 0;
 
-        if (points > 0) {
+        if (!team) {
+            console.error('❌ Équipe non trouvée:', teamId);
+            return;
+        }
+
+        const points = team.lastPoints || 0;
+        const hasAnswered = team.hasAnswered || false;
+        const answer = team.answer;
+
+        console.log('📊 Résultat stagiaire:', { points, hasAnswered, answer, isCorrect: team.isCorrect });
+
+        // Vérifier si le stagiaire a vraiment répondu
+        if (!hasAnswered || answer === null || answer === undefined) {
+            // N'a pas répondu - afficher "Temps écoulé"
+            document.getElementById('trainee-result-icon').textContent = '⏰';
+            document.getElementById('trainee-result-title').textContent = 'Temps écoulé !';
+            document.getElementById('trainee-result-title').className = 'text-5xl md:text-6xl font-bold mb-6 text-orange-600';
+            document.getElementById('trainee-points-earned').textContent = '0';
+        } else if (points > 0) {
+            // Bonne réponse
             document.getElementById('trainee-result-icon').textContent = '✓';
             document.getElementById('trainee-result-title').textContent = 'Bonne réponse !';
             document.getElementById('trainee-result-title').className = 'text-5xl md:text-6xl font-bold mb-6 text-green-600';
+            document.getElementById('trainee-points-earned').textContent = '+' + points;
         } else {
+            // Mauvaise réponse
             document.getElementById('trainee-result-icon').textContent = '✗';
             document.getElementById('trainee-result-title').textContent = 'Mauvaise réponse';
             document.getElementById('trainee-result-title').className = 'text-5xl md:text-6xl font-bold mb-6 text-red-600';
+            document.getElementById('trainee-points-earned').textContent = '0';
         }
 
-            document.getElementById('trainee-points-earned').textContent = points > 0 ? '+' + points : '0';
         document.getElementById('trainee-total-score').textContent = (team.score || 0) + ' pts';
     });
 
