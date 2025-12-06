@@ -709,8 +709,22 @@ function generateUUID() {
     });
 }
 
-// Base de données complète des questions SST (extrait de sst.html)
+// Base de données complète des questions SST (ordre réorganisé: DC4, DC1, DC2, DC3)
 const BOXES_DATA = [
+    {
+        title: 'DC4 - Prévention',
+        subtitle: 'Situations spécifiques et prévention',
+        icon: '🏥',
+        color: 'from-purple-500 to-pink-600',
+        games: [
+            { type: 'quiz', title: 'Rôle de prévention', question: 'En plus des secours, quel est l\'autre rôle majeur du SST ?', options: ['Nettoyer les lieux', 'Participer à la prévention des risques', 'Former les autres', 'Gérer la trousse'], correctAnswer: 1, explanation: 'Le SST participe activement à la prévention des risques professionnels dans son entreprise.' },
+            { type: 'quiz', title: 'DAE', question: 'Le SST peut-il utiliser un défibrillateur automatisé externe (DAE) ?', options: ['Non, formation spécifique requise', 'Oui, tout citoyen peut l\'utiliser', 'Seulement les pompiers', 'Sur prescription uniquement'], correctAnswer: 1, explanation: 'Tout citoyen, y compris les SST, peut utiliser un DAE. L\'appareil guide l\'utilisateur.' },
+            { type: 'true-false', title: 'Recyclage', question: 'Le certificat SST doit être recyclé tous les 2 ans.', options: ['Vrai', 'Faux'], correctAnswer: 0, explanation: 'VRAI - Le recyclage SST doit avoir lieu tous les 24 mois pour maintenir la validité du certificat.' },
+            { type: 'matching', title: 'Acteurs de prévention', question: 'Associez chaque acteur à son rôle :', pairs: [{ left: 'SST', right: 'Premiers secours et prévention' }, { left: 'Médecin du travail', right: 'Santé des salariés' }, { left: 'CHSCT/CSE', right: 'Représentation du personnel' }, { left: 'Employeur', right: 'Responsable sécurité' }], explanation: 'Chaque acteur a un rôle complémentaire dans la prévention des risques professionnels.' },
+            { type: 'sequence', title: 'Démarche de prévention', question: 'Remettez dans l\'ordre les étapes de la démarche de prévention :', items: ['Repérer le danger', 'Analyser les risques', 'Proposer des solutions', 'Informer et suivre'], correctOrder: [0, 1, 2, 3], explanation: 'La démarche de prévention suit une logique rigoureuse pour réduire efficacement les risques.' },
+            { type: 'quiz', title: 'Document unique', question: 'Le Document Unique d\'Évaluation des Risques (DUER) doit être mis à jour :', options: ['Tous les ans obligatoirement', 'En cas de modification importante ou nouvel équipement', 'Seulement en cas d\'accident grave', 'Tous les 5 ans'], correctAnswer: 1, explanation: 'Le DUER doit être mis à jour dès qu\'il y a une modification significative dans l\'entreprise.' }
+        ]
+    },
     {
         title: 'DC1 - Protéger',
         subtitle: 'Situer son rôle et protéger',
@@ -753,20 +767,6 @@ const BOXES_DATA = [
             { type: 'sequence', title: 'Contenu de l\'alerte', question: 'Ordre des informations à donner aux secours :', items: ['Lieu exact et accès', 'Nature de l\'accident', 'Nombre et état des victimes', 'Gestes déjà effectués'], correctOrder: [0, 1, 2, 3], explanation: 'Suivre cet ordre permet de transmettre efficacement toutes les informations nécessaires aux secours.' },
             { type: 'quiz', title: 'RCP', question: 'Lors d\'une RCP, quel est le ratio compressions/insufflations ?', options: ['15 compressions pour 2 insufflations', '30 compressions pour 2 insufflations', '10 compressions pour 1 insufflation', '5 compressions pour 1 insufflation'], correctAnswer: 1, explanation: 'Le ratio recommandé est de 30 compressions thoraciques pour 2 insufflations.' },
             { type: 'true-false', title: 'Défibrillateur', question: 'Le défibrillateur automatisé externe (DAE) peut être utilisé par toute personne, même sans formation.', options: ['Vrai', 'Faux'], correctAnswer: 0, explanation: 'VRAI - Selon la loi, toute personne peut utiliser un DAE. L\'appareil donne des instructions vocales et ne délivrera un choc que si nécessaire.' }
-        ]
-    },
-    {
-        title: 'DC4 - Prévention',
-        subtitle: 'Situations spécifiques et prévention',
-        icon: '🏥',
-        color: 'from-purple-500 to-pink-600',
-        games: [
-            { type: 'quiz', title: 'Rôle de prévention', question: 'En plus des secours, quel est l\'autre rôle majeur du SST ?', options: ['Nettoyer les lieux', 'Participer à la prévention des risques', 'Former les autres', 'Gérer la trousse'], correctAnswer: 1, explanation: 'Le SST participe activement à la prévention des risques professionnels dans son entreprise.' },
-            { type: 'quiz', title: 'DAE', question: 'Le SST peut-il utiliser un défibrillateur automatisé externe (DAE) ?', options: ['Non, formation spécifique requise', 'Oui, tout citoyen peut l\'utiliser', 'Seulement les pompiers', 'Sur prescription uniquement'], correctAnswer: 1, explanation: 'Tout citoyen, y compris les SST, peut utiliser un DAE. L\'appareil guide l\'utilisateur.' },
-            { type: 'true-false', title: 'Recyclage', question: 'Le certificat SST doit être recyclé tous les 2 ans.', options: ['Vrai', 'Faux'], correctAnswer: 0, explanation: 'VRAI - Le recyclage SST doit avoir lieu tous les 24 mois pour maintenir la validité du certificat.' },
-            { type: 'matching', title: 'Acteurs de prévention', question: 'Associez chaque acteur à son rôle :', pairs: [{ left: 'SST', right: 'Premiers secours et prévention' }, { left: 'Médecin du travail', right: 'Santé des salariés' }, { left: 'CHSCT/CSE', right: 'Représentation du personnel' }, { left: 'Employeur', right: 'Responsable sécurité' }], explanation: 'Chaque acteur a un rôle complémentaire dans la prévention des risques professionnels.' },
-            { type: 'sequence', title: 'Démarche de prévention', question: 'Remettez dans l\'ordre les étapes de la démarche de prévention :', items: ['Repérer le danger', 'Analyser les risques', 'Proposer des solutions', 'Informer et suivre'], correctOrder: [0, 1, 2, 3], explanation: 'La démarche de prévention suit une logique rigoureuse pour réduire efficacement les risques.' },
-            { type: 'quiz', title: 'Document unique', question: 'Le Document Unique d\'Évaluation des Risques (DUER) doit être mis à jour :', options: ['Tous les ans obligatoirement', 'En cas de modification importante ou nouvel équipement', 'Seulement en cas d\'accident grave', 'Tous les 5 ans'], correctAnswer: 1, explanation: 'Le DUER doit être mis à jour dès qu\'il y a une modification significative dans l\'entreprise.' }
         ]
     }
 ];
