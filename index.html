@@ -175,7 +175,6 @@
         .rank-3 { background: linear-gradient(135deg, #CD7F32 0%, #8B4513 100%); }
         .rank-other { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); }
 
-        /* ✅ NOUVELLE VERSION - Protection scroll correcte */
         body.trainee-connected {
             overflow: hidden !important;
             height: 100vh !important;
@@ -493,12 +492,12 @@
                     showCustomAlert('Cette session n\'existe plus. Veuillez rejoindre une nouvelle session.');
                     clearSessionFromURL();
                     disableTraineeScrollProtection();
-                    showScreen('trainee-login');
+                    showScreenSafe('trainee-login');
                     return;
                 }
 
                 if (status === 'waiting') {
-                    showScreen('trainee-waiting');
+                    showScreenSafe('trainee-waiting');
                     document.getElementById('trainee-team-name-display').textContent = teamName;
 
                     database.ref('sessions/' + sessionId + '/status').on('value', (snapshot) => {
@@ -521,38 +520,76 @@
             console.log('🗑️ Session effacée de l\'URL');
         }
 
-        // ✅ NOUVELLE VERSION - Protection scroll correcte
+        // ✅ Activation protection scroll
         function enableTraineeScrollProtection() {
             document.body.classList.add('trainee-connected');
             console.log('🔒 Protection scroll activée');
         }
 
-        // ✅ NOUVELLE VERSION - Désactiver protection
+        // ✅ Désactivation protection scroll
         function disableTraineeScrollProtection() {
             document.body.classList.remove('trainee-connected');
             console.log('🔓 Protection scroll désactivée');
         }
 
-        // Nettoyer TOUS les listeners Firebase actifs
-        function cleanupAllListeners() {
-            console.log('🧹 Nettoyage de tous les listeners...');
+        // ✅ NOUVELLE FONCTION: Nettoyer TOUS les listeners Firebase actifs
+        function cleanupAllFirebaseListeners() {
+            console.log('🧹 Nettoyage complet de tous les listeners Firebase...');
             
-            if (answersListener) {
-                database.ref('sessions/' + sessionId + '/answersCount').off('value', answersListener);
-                answersListener = null;
-            }
-            
+            // Arrêter le timer
             if (timerInterval) {
                 clearInterval(timerInterval);
                 timerInterval = null;
             }
             
-            allActiveListeners.forEach(ref => {
-                ref.off();
+            // Arrêter les listeners de gameStatus
+            if (gameStatusListener) {
+                database.ref('sessions/' + sessionId + '/gameStatus').off('value', gameStatusListener);
+                gameStatusListener = null;
+            }
+            
+            // Arrêter les listeners de currentGame
+            if (currentGameListener) {
+                database.ref('sessions/' + sessionId + '/currentGame').off('value', currentGameListener);
+                currentGameListener = null;
+            }
+            
+            // Arrêter le listener de answersCount
+            if (answersListener) {
+                database.ref('sessions/' + sessionId + '/answersCount').off('value', answersListener);
+                answersListener = null;
+            }
+            
+            // Arrêter tous les autres listeners
+            allActiveListeners.forEach(listener => {
+                try {
+                    listener.off();
+                } catch(e) {
+                    console.log('Erreur lors du nettoyage:', e);
+                }
             });
             allActiveListeners = [];
             
             console.log('✅ Tous les listeners nettoyés');
+        }
+
+        // ✅ NOUVELLE FONCTION: Afficher un écran ET nettoyer les anciens listeners
+        function showScreenSafe(screenId) {
+            console.log('📺 Affichage de l\'écran:', screenId);
+            
+            // Nettoyer les listeners AVANT de changer d'écran
+            cleanupAllFirebaseListeners();
+            
+            // Cacher tous les écrans
+            document.querySelectorAll('#app > div').forEach(screen => {
+                screen.classList.add('hidden');
+            });
+            
+            // Afficher le nouvel écran
+            document.getElementById(screenId).classList.remove('hidden');
+            
+            // Scroll vers le haut de l'écran
+            document.getElementById('app').scrollTop = 0;
         }
 
         // Démarrer le timer de 30 secondes
@@ -807,7 +844,7 @@
             return allGames.slice(0, 7);
         }
 
-        // === FONCTION: Préparer le jeu avec réponses mélangées ===
+        // Préparer le jeu avec réponses mélangées
         function prepareGameWithShuffledAnswers(game) {
             let shuffledGame = { ...game };
 
@@ -817,7 +854,6 @@
                     originalIndex: i 
                 }));
                 
-                // Mélange Fisher-Yates
                 for (let i = optionsWithIndex.length - 1; i > 0; i--) {
                     const j = Math.floor(Math.random() * (i + 1));
                     [optionsWithIndex[i], optionsWithIndex[j]] = 
@@ -857,13 +893,11 @@
                     side: 'right'
                 }));
                 
-                // Mélanger gauche
                 for (let i = pairsLeft.length - 1; i > 0; i--) {
                     const j = Math.floor(Math.random() * (i + 1));
                     [pairsLeft[i], pairsLeft[j]] = [pairsLeft[j], pairsLeft[i]];
                 }
                 
-                // Mélanger droite
                 for (let i = pairsRight.length - 1; i > 0; i--) {
                     const j = Math.floor(Math.random() * (i + 1));
                     [pairsRight[i], pairsRight[j]] = [pairsRight[j], pairsRight[i]];
@@ -960,7 +994,7 @@
         });
 
         function showBoxesScreen() {
-            showScreen('boxes-screen');
+            showScreenSafe('boxes-screen');
             database.ref('sessions/' + sessionId + '/openedBoxes').once('value', (snapshot) => {
                 openedBoxes = snapshot.val() || [];
                 renderBoxes();
@@ -1003,15 +1037,11 @@
         function loadGame() {
             console.log('🔄 Question', currentGameIndex);
 
-            cleanupAllListeners();
-
             database.ref('sessions/' + sessionId + '/randomizedGames').once('value', (snapshot) => {
                 const games = snapshot.val();
                 if (!games || !games[currentGameIndex]) return;
 
                 let game = games[currentGameIndex];
-                
-                // 🔥 PRÉPARER LES RÉPONSES MÉLANGÉES ICI
                 const preparedGame = prepareGameWithShuffledAnswers(game);
 
                 resetAnswersFlags().then(() => {
@@ -1053,7 +1083,7 @@
         }
 
         function showProjectorQuestion(game) {
-            showScreen('projector-question');
+            showScreenSafe('projector-question');
             document.getElementById('projector-game-icon').textContent = getGameIcon(game.type);
             document.getElementById('projector-question-text').textContent = game.question;
 
@@ -1143,12 +1173,10 @@
                 const games = snapshot.val();
                 const game = games[currentGameIndex];
 
-                // ✅ CALCULER LES SCORES AVANT D'AFFICHER
                 calculateAndUpdateScores(game);
 
-                // ⏳ Attendre un peu que Firebase mette à jour
                 setTimeout(() => {
-                    showScreen('projector-correction');
+                    showScreenSafe('projector-correction');
                     document.getElementById('projector-explanation').textContent = game.explanation || 'Bonne réponse !';
 
                     const container = document.getElementById('projector-correction-content');
@@ -1201,7 +1229,6 @@
                 Object.entries(teams).forEach(([id, team]) => {
                     let points = 0;
                     
-                    // ✅ CORRECTION: Vérifier si la réponse est correcte
                     if (team.isCorrect === true) {
                         points = 150;
                     }
@@ -1210,7 +1237,6 @@
                     
                     const newScore = (team.score || 0) + points;
                     
-                    // ✅ IMPORTANT: Sauvegarder LASTPOINTS ET le score
                     database.ref('sessions/' + sessionId + '/teams/' + id).update({
                         score: newScore,
                         lastPoints: points
@@ -1256,7 +1282,7 @@
         });
 
         function showPauseScreen() {
-            showScreen('pause-screen');
+            showScreenSafe('pause-screen');
             database.ref('sessions/' + sessionId + '/gameStatus').set('pause');
 
             document.getElementById('pause-box-number').textContent = currentBox + 1;
@@ -1295,7 +1321,7 @@
         }
 
         function showPodium() {
-            showScreen('podium-screen');
+            showScreenSafe('podium-screen');
             database.ref('sessions/' + sessionId + '/gameStatus').set('finished');
             createConfetti();
 
@@ -1354,16 +1380,16 @@
                             console.log('❌ Équipe inexistante, affichage login');
                             clearSessionFromURL();
                             userRole = 'trainee';
-                            showScreen('trainee-login');
+                            showScreenSafe('trainee-login');
                         }
                     }).catch(error => {
                         console.error('❌ Erreur reconnexion:', error);
                         userRole = 'trainee';
-                        showScreen('trainee-login');
+                        showScreenSafe('trainee-login');
                     });
                 } else {
                     userRole = 'trainee';
-                    showScreen('trainee-login');
+                    showScreenSafe('trainee-login');
                 }
             }
         });
@@ -1395,7 +1421,7 @@
 
                 enableTraineeScrollProtection();
 
-                showScreen('trainee-waiting');
+                showScreenSafe('trainee-waiting');
                 document.getElementById('trainee-team-name-display').textContent = teamName;
 
                 database.ref('sessions/' + sessionId + '/status').on('value', (snapshot) => {
@@ -1411,7 +1437,8 @@
         });
 
         function listenForGameUpdatesTrainee() {
-            // Nettoyer l'ancien listener s'il existe
+            cleanupAllFirebaseListeners();
+
             if (gameStatusListener) {
                 database.ref('sessions/' + sessionId + '/gameStatus').off('value', gameStatusListener);
             }
@@ -1419,7 +1446,6 @@
                 database.ref('sessions/' + sessionId + '/currentGame').off('value', currentGameListener);
             }
 
-            // ✅ CORRECTION: Utiliser .on() au lieu de .once()
             gameStatusListener = (snapshot) => {
                 const gameStatus = snapshot.val();
                 console.log('📡 gameStatus reçu:', gameStatus);
@@ -1436,9 +1462,10 @@
                 } else if (gameStatus === 'correction') {
                     showTraineeResult();
                 } else if (gameStatus === 'pause' || gameStatus === 'boxes') {
-                    showScreen('ranking-screen');
+                    showScreenSafe('ranking-screen');
                     displayRanking('ranking-list');
                 } else if (gameStatus === 'finished') {
+                    showScreenSafe('podium-screen');
                     showPodium();
                 }
             };
@@ -1447,7 +1474,7 @@
         }
 
         function showTraineeGame(game) {
-            showScreen('trainee-game');
+            showScreenSafe('trainee-game');
 
             document.getElementById('trainee-team-display').textContent = teamName;
 
@@ -1470,7 +1497,6 @@
             btn.onclick = () => validateTraineeAnswer(game);
         }
 
-        // ✅ NOUVELLE FONCTION: Rendu SANS REMÉLANGER
         function renderGameForTraineeNOSHUFFLE(game) {
             if (game.type === 'quiz' || game.type === 'true-false') {
                 return `
@@ -1652,7 +1678,6 @@
 
             console.log('📤 Envoi de la réponse:', { answer, isCorrect });
 
-            // ✅ IMPORTANT: Sauvegarder isCorrect!
             database.ref('sessions/' + sessionId + '/teams/' + teamId).update({
                 hasAnswered: true,
                 answer: answer,
@@ -1665,7 +1690,7 @@
                 });
             }).then(() => {
                 console.log('✅ Compteur incrémenté!');
-                showScreen('trainee-waiting-others');
+                showScreenSafe('trainee-waiting-others');
             }).catch((error) => {
                 console.error('❌ Erreur envoi réponse:', error);
                 btn.disabled = false;
@@ -1676,7 +1701,7 @@
         }
 
         function showTraineeResult() {
-            showScreen('trainee-result');
+            showScreenSafe('trainee-result');
 
             database.ref('sessions/' + sessionId + '/teams/' + teamId).once('value', (snapshot) => {
                 const team = snapshot.val();
