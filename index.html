@@ -1032,7 +1032,7 @@
 
                     return database.ref('sessions/' + sessionId).update({
                         answersCount: 0,
-                        currentGame: preparedGame, // ← SAUVEGARDER LE JEU AVEC LES RÉPONSES MÉLANGÉES
+                        currentGame: preparedGame,
                         currentGameIndex: currentGameIndex,
                         gameStatus: 'question',
                         questionTimestamp: Date.now()
@@ -1156,14 +1156,19 @@
                 const games = snapshot.val();
                 const game = games[currentGameIndex];
 
-                showScreen('projector-correction');
-                document.getElementById('projector-explanation').textContent = game.explanation || 'Bonne réponse !';
-
-                const container = document.getElementById('projector-correction-content');
-                container.innerHTML = renderCorrection(game);
-
+                // ✅ CALCULER LES SCORES AVANT D'AFFICHER
                 calculateAndUpdateScores(game);
-                database.ref('sessions/' + sessionId + '/gameStatus').set('correction');
+
+                // ⏳ Attendre un peu que Firebase mette à jour
+                setTimeout(() => {
+                    showScreen('projector-correction');
+                    document.getElementById('projector-explanation').textContent = game.explanation || 'Bonne réponse !';
+
+                    const container = document.getElementById('projector-correction-content');
+                    container.innerHTML = renderCorrection(game);
+
+                    database.ref('sessions/' + sessionId + '/gameStatus').set('correction');
+                }, 500);
             });
         }
 
@@ -1208,10 +1213,17 @@
 
                 Object.entries(teams).forEach(([id, team]) => {
                     let points = 0;
-                    if (team.isCorrect) {
+                    
+                    // ✅ CORRECTION: Vérifier si la réponse est correcte
+                    if (team.isCorrect === true) {
                         points = 150;
                     }
+                    
+                    console.log('📊 Équipe:', team.name, '| isCorrect:', team.isCorrect, '| Points:', points);
+                    
                     const newScore = (team.score || 0) + points;
+                    
+                    // ✅ IMPORTANT: Sauvegarder LASTPOINTS ET le score
                     database.ref('sessions/' + sessionId + '/teams/' + id).update({
                         score: newScore,
                         lastPoints: points
@@ -1458,7 +1470,6 @@
             });
 
             const container = document.getElementById('trainee-game-container');
-            // ✅ Pas de remélange - afficher directement les réponses du serveur
             container.innerHTML = renderGameForTraineeNOSHUFFLE(game);
 
             selectedAnswer = null;
@@ -1654,12 +1665,13 @@
 
             console.log('📤 Envoi de la réponse:', { answer, isCorrect });
 
+            // ✅ IMPORTANT: Sauvegarder isCorrect!
             database.ref('sessions/' + sessionId + '/teams/' + teamId).update({
                 hasAnswered: true,
                 answer: answer,
                 isCorrect: isCorrect
             }).then(() => {
-                console.log('✅ Réponse sauvegardée');
+                console.log('✅ Réponse sauvegardée avec isCorrect:', isCorrect);
                 const countRef = database.ref('sessions/' + sessionId + '/answersCount');
                 return countRef.transaction((currentCount) => {
                     return (currentCount || 0) + 1;
@@ -1728,4 +1740,4 @@
 
     </script>
 </body>
-    </html>
+</html>
