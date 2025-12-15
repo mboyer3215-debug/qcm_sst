@@ -1,3 +1,6 @@
+Bien sûr ! Voici le **fichier HTML complet corrigé** :
+
+```html
 <!DOCTYPE html>
 <html lang="fr" class="h-full">
 <head>
@@ -61,7 +64,6 @@
             text-shadow: 0 0 10px rgba(93, 92, 222, 0.8), 0 0 20px rgba(93, 92, 222, 0.6), 0 0 30px rgba(93, 92, 222, 0.4);
         }
 
-        /* Options de réponse - améliorées pour visibilité */
         .answer-option {
             transition: all 0.3s ease;
             cursor: pointer;
@@ -90,7 +92,6 @@
             background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(239, 68, 68, 0.1) 100%);
         }
 
-        /* Séquençage - amélioré */
         .sequence-item {
             transition: all 0.3s;
             cursor: pointer;
@@ -127,7 +128,6 @@
             box-shadow: 0 2px 6px rgba(0,0,0,0.3);
         }
 
-        /* Matching - amélioré */
         .matching-item {
             transition: all 0.3s;
             cursor: pointer;
@@ -150,7 +150,6 @@
             cursor: not-allowed;
         }
 
-        /* Box désactivé */
         .box-disabled {
             opacity: 0.5;
             cursor: not-allowed !important;
@@ -179,7 +178,6 @@
         .rank-3 { background: linear-gradient(135deg, #CD7F32 0%, #8B4513 100%); }
         .rank-other { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); }
 
-        /* Prévention du scroll pour les stagiaires connectés */
         body.trainee-connected {
             overflow: hidden !important;
             position: fixed !important;
@@ -196,7 +194,6 @@
             position: relative !important;
         }
 
-        /* Cacher l'écran de login une fois connecté */
         body.trainee-connected #trainee-login {
             display: none !important;
         }
@@ -432,1298 +429,1218 @@
     </div>
 
     <script>
-// Configuration Firebase
-const firebaseConfig = {
-    apiKey: "AIzaSyAZLBDZIaPp3GrXuVz4fPiK91JhLEqXPs0",
-    authDomain: "jeu-sst-v1-291025.firebaseapp.com",
-    databaseURL: "https://jeu-sst-v1-291025-default-rtdb.europe-west1.firebasedatabase.app",
-    projectId: "jeu-sst-v1-291025",
-    storageBucket: "jeu-sst-v1-291025.firebasestorage.app",
-    messagingSenderId: "57462613537",
-    appId: "1:57462613537:web:6178195b2f4f08fbaa2560"
-};
+        // Configuration Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyAZLBDZIaPp3GrXuVz4fPiK91JhLEqXPs0",
+            authDomain: "jeu-sst-v1-291025.firebaseapp.com",
+            databaseURL: "https://jeu-sst-v1-291025-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "jeu-sst-v1-291025",
+            storageBucket: "jeu-sst-v1-291025.firebasestorage.app",
+            messagingSenderId: "57462613537",
+            appId: "1:57462613537:web:6178195b2f4f08fbaa2560"
+        };
 
-// Variables globales
-let database = null;
-let sessionId = null;
-let userRole = null;
-let teamName = null;
-let teamId = null;
-let currentBox = 0;
-let currentGameIndex = 0;
-let selectedAnswer = null;
-let selectedSequence = [];
-let selectedMatching = [];
-let openedBoxes = [];
-let answersListener = null;
-let allActiveListeners = []; // Tracker tous les listeners actifs
-let timerInterval = null;
-let timeRemaining = 30;
+        // Variables globales
+        let database = null;
+        let sessionId = null;
+        let userRole = null;
+        let teamName = null;
+        let teamId = null;
+        let currentBox = 0;
+        let currentGameIndex = 0;
+        let selectedAnswer = null;
+        let selectedSequence = [];
+        let selectedMatching = [];
+        let openedBoxes = [];
+        let answersListener = null;
+        let allActiveListeners = [];
+        let timerInterval = null;
+        let timeRemaining = 30;
+        let gameStatusListener = null;
+        let currentGameListener = null;
 
-const SUPERVISOR_PASSWORD = "sst2025";
-const QUESTION_TIME_LIMIT = 30; // 30 secondes par question
+        const SUPERVISOR_PASSWORD = "sst2025";
+        const QUESTION_TIME_LIMIT = 30;
 
-// === GESTION PERSISTANCE SESSION (via URL) ===
-// Sauvegarder la session en mettant à jour l'URL
-function saveTraineeSessionToURL() {
-    if (userRole === 'trainee' && teamId && sessionId) {
-        const url = new URL(window.location.href);
-        url.searchParams.set('session', sessionId);
-        url.searchParams.set('team', teamId);
-        window.history.replaceState({}, '', url.toString());
-        console.log('💾 Session sauvegardée dans URL:', { sessionId, teamId });
-    }
-}
-
-// Vérifier si une équipe existe dans Firebase
-function checkTeamExists(sessionId, teamId) {
-    return database.ref('sessions/' + sessionId + '/teams/' + teamId).once('value').then(snapshot => {
-        return snapshot.exists() ? snapshot.val() : null;
-    });
-}
-
-// Reconnecter à une session existante
-function reconnectToSession(sessionId, teamId, teamData) {
-    console.log('🔄 Reconnexion à la session:', { sessionId, teamId, teamName: teamData.name });
-
-    userRole = 'trainee';
-    teamName = teamData.name;
-
-    // Activer la protection anti-scroll
-    enableTraineeScrollProtection();
-
-    // Réactiver le listener de déconnexion
-    const teamRef = database.ref('sessions/' + sessionId + '/teams/' + teamId);
-    teamRef.onDisconnect().remove();
-    console.log('🔌 Listener de déconnexion réactivé pour:', teamName);
-
-    // Vérifier le statut de la session
-    database.ref('sessions/' + sessionId + '/status').once('value', (snapshot) => {
-        const status = snapshot.val();
-
-        if (!status) {
-            // Session n'existe pas ou plus
-            showCustomAlert('Cette session n\'existe plus. Veuillez rejoindre une nouvelle session.');
-            clearSessionFromURL();
-            disableTraineeScrollProtection();
-            showScreen('trainee-login');
-            return;
+        // Sauvegarder la session en mettant à jour l'URL
+        function saveTraineeSessionToURL() {
+            if (userRole === 'trainee' && teamId && sessionId) {
+                const url = new URL(window.location.href);
+                url.searchParams.set('session', sessionId);
+                url.searchParams.set('team', teamId);
+                window.history.replaceState({}, '', url.toString());
+                console.log('💾 Session sauvegardée dans URL:', { sessionId, teamId });
+            }
         }
 
-        if (status === 'waiting') {
-            // En attente de démarrage
-            showScreen('trainee-waiting');
-            document.getElementById('trainee-team-name-display').textContent = teamName;
+        // Vérifier si une équipe existe dans Firebase
+        function checkTeamExists(sessionId, teamId) {
+            return database.ref('sessions/' + sessionId + '/teams/' + teamId).once('value').then(snapshot => {
+                return snapshot.exists() ? snapshot.val() : null;
+            });
+        }
 
-            // Écouter le démarrage
-            database.ref('sessions/' + sessionId + '/status').on('value', (snapshot) => {
-                const newStatus = snapshot.val();
-                if (newStatus === 'playing') {
+        // Reconnecter à une session existante
+        function reconnectToSession(sessionId, teamId, teamData) {
+            console.log('🔄 Reconnexion à la session:', { sessionId, teamId, teamName: teamData.name });
+
+            userRole = 'trainee';
+            teamName = teamData.name;
+
+            enableTraineeScrollProtection();
+
+            const teamRef = database.ref('sessions/' + sessionId + '/teams/' + teamId);
+            teamRef.onDisconnect().remove();
+            console.log('🔌 Listener de déconnexion réactivé pour:', teamName);
+
+            database.ref('sessions/' + sessionId + '/status').once('value', (snapshot) => {
+                const status = snapshot.val();
+
+                if (!status) {
+                    showCustomAlert('Cette session n\'existe plus. Veuillez rejoindre une nouvelle session.');
+                    clearSessionFromURL();
+                    disableTraineeScrollProtection();
+                    showScreen('trainee-login');
+                    return;
+                }
+
+                if (status === 'waiting') {
+                    showScreen('trainee-waiting');
+                    document.getElementById('trainee-team-name-display').textContent = teamName;
+
+                    database.ref('sessions/' + sessionId + '/status').on('value', (snapshot) => {
+                        const newStatus = snapshot.val();
+                        if (newStatus === 'playing') {
+                            listenForGameUpdatesTrainee();
+                        }
+                    });
+                } else if (status === 'playing') {
                     listenForGameUpdatesTrainee();
                 }
             });
-        } else if (status === 'playing') {
-            // Jeu en cours - rejoindre directement
-            listenForGameUpdatesTrainee();
         }
-    });
-}
 
-// Effacer la session de l'URL
-function clearSessionFromURL() {
-    const url = new URL(window.location.href);
-    url.searchParams.delete('team');
-    window.history.replaceState({}, '', url.toString());
-    console.log('🗑️ Session effacée de l\'URL');
-}
+        // Effacer la session de l'URL
+        function clearSessionFromURL() {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('team');
+            window.history.replaceState({}, '', url.toString());
+            console.log('🗑️ Session effacée de l\'URL');
+        }
 
-// Activer la protection anti-scroll pour les stagiaires
-function enableTraineeScrollProtection() {
-    document.body.classList.add('trainee-connected');
-    console.log('🔒 Protection scroll activée');
-    console.log('📍 Classes du body:', document.body.className);
-
-    // Vérifier toutes les 2 secondes que la protection est toujours active
-    const checkInterval = setInterval(() => {
-        if (!document.body.classList.contains('trainee-connected')) {
-            console.warn('⚠️ Protection scroll perdue - réactivation');
+        // Activer la protection anti-scroll pour les stagiaires
+        function enableTraineeScrollProtection() {
             document.body.classList.add('trainee-connected');
-        }
-    }, 2000);
+            console.log('🔒 Protection scroll activée');
 
-    // Stocker l'interval pour pouvoir l'arrêter plus tard si besoin
-    window.scrollProtectionInterval = checkInterval;
-}
+            const checkInterval = setInterval(() => {
+                if (!document.body.classList.contains('trainee-connected')) {
+                    console.warn('⚠️ Protection scroll perdue - réactivation');
+                    document.body.classList.add('trainee-connected');
+                }
+            }, 2000);
 
-// Désactiver la protection anti-scroll
-function disableTraineeScrollProtection() {
-    document.body.classList.remove('trainee-connected');
-    console.log('🔓 Protection scroll désactivée');
-}
-
-// Nettoyer TOUS les listeners Firebase actifs
-function cleanupAllListeners() {
-    console.log('🧹 Nettoyage de tous les listeners...');
-    if (answersListener) {
-        database.ref('sessions/' + sessionId + '/answersCount').off('value', answersListener);
-        answersListener = null;
-    }
-    // Nettoyer le timer
-    if (timerInterval) {
-        clearInterval(timerInterval);
-        timerInterval = null;
-    }
-    // Nettoyer tous les listeners trackés
-    allActiveListeners.forEach(ref => {
-        ref.off();
-    });
-    allActiveListeners = [];
-    console.log('✅ Tous les listeners nettoyés');
-}
-
-// Démarrer le timer de 30 secondes
-function startQuestionTimer() {
-    timeRemaining = QUESTION_TIME_LIMIT;
-    document.getElementById('timer-display').textContent = timeRemaining;
-    document.getElementById('timer-display').style.color = 'white';
-
-    timerInterval = setInterval(() => {
-        timeRemaining--;
-        document.getElementById('timer-display').textContent = timeRemaining;
-
-        // Changer la couleur selon le temps restant
-        if (timeRemaining <= 5) {
-            document.getElementById('timer-display').style.color = '#FF0000';
-            document.getElementById('timer-display').classList.add('pulse-anim');
-        } else if (timeRemaining <= 10) {
-            document.getElementById('timer-display').style.color = '#FFA500';
+            window.scrollProtectionInterval = checkInterval;
         }
 
-        // Temps écoulé
-        if (timeRemaining <= 0) {
-            clearInterval(timerInterval);
-            timerInterval = null;
-            handleTimeUp();
+        // Désactiver la protection anti-scroll
+        function disableTraineeScrollProtection() {
+            document.body.classList.remove('trainee-connected');
+            console.log('🔓 Protection scroll désactivée');
         }
-    }, 1000);
-}
 
-// Quand le temps est écoulé
-function handleTimeUp() {
-    console.log('⏰ Temps écoulé!');
-
-    // Jouer le son de klaxon
-    playHornSound();
-
-    // Marquer les non-répondants comme faux
-    database.ref('sessions/' + sessionId + '/teams').once('value', (snapshot) => {
-        const teams = snapshot.val();
-        if (!teams) return;
-
-        const updates = {};
-        let nonRespondantsCount = 0;
-        const totalTeams = Object.keys(teams).length;
-
-        Object.entries(teams).forEach(([id, team]) => {
-            if (!team.hasAnswered) {
-                updates['sessions/' + sessionId + '/teams/' + id + '/hasAnswered'] = true;
-                updates['sessions/' + sessionId + '/teams/' + id + '/answer'] = null;
-                updates['sessions/' + sessionId + '/teams/' + id + '/isCorrect'] = false;
-                nonRespondantsCount++;
-            }
-        });
-
-        console.log('📊 Fin timer - Non-répondants:', nonRespondantsCount, '/ Total:', totalTeams);
-
-        // Mettre à jour Firebase
-        if (Object.keys(updates).length > 0) {
-            database.ref().update(updates).then(() => {
-                // Incrémenter le compteur pour les non-répondants
-                const countRef = database.ref('sessions/' + sessionId + '/answersCount');
-                countRef.transaction((currentCount) => {
-                    return (currentCount || 0) + nonRespondantsCount;
-                }).then(() => {
-                    // Après mise à jour, vérifier si tout le monde a répondu
-                    checkIfAllAnswered();
-                });
-            });
-        } else {
-            // Tout le monde a déjà répondu avant la fin du timer
-            console.log('✅ Tout le monde avait déjà répondu - passage à la correction');
-            // Nettoyer le listener et passer directement à la correction
+        // Nettoyer TOUS les listeners Firebase actifs
+        function cleanupAllListeners() {
+            console.log('🧹 Nettoyage de tous les listeners...');
+            
             if (answersListener) {
                 database.ref('sessions/' + sessionId + '/answersCount').off('value', answersListener);
                 answersListener = null;
             }
-            setTimeout(() => showCorrection(), 1000);
+            
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+            
+            allActiveListeners.forEach(ref => {
+                ref.off();
+            });
+            allActiveListeners = [];
+            
+            console.log('✅ Tous les listeners nettoyés');
         }
-    });
-}
 
-// Vérifier si toutes les équipes ont répondu
-function checkIfAllAnswered() {
-    database.ref('sessions/' + sessionId + '/teams').once('value', (teamsSnapshot) => {
-        const teams = teamsSnapshot.val();
-        if (!teams) return;
+        // Démarrer le timer de 30 secondes
+        function startQuestionTimer() {
+            timeRemaining = QUESTION_TIME_LIMIT;
+            document.getElementById('timer-display').textContent = timeRemaining;
+            document.getElementById('timer-display').style.color = 'white';
 
-        const totalTeams = Object.keys(teams).length;
+            timerInterval = setInterval(() => {
+                timeRemaining--;
+                document.getElementById('timer-display').textContent = timeRemaining;
 
-        database.ref('sessions/' + sessionId + '/answersCount').once('value', (countSnapshot) => {
-            const count = countSnapshot.val() || 0;
-            console.log('🔍 Vérification réponses:', count, '/', totalTeams);
-
-            if (count >= totalTeams && totalTeams > 0) {
-                console.log('✅ Tous ont répondu après timeout - passage correction');
-                // Nettoyer le listener
-                if (answersListener) {
-                    database.ref('sessions/' + sessionId + '/answersCount').off('value', answersListener);
-                    answersListener = null;
+                if (timeRemaining <= 5) {
+                    document.getElementById('timer-display').style.color = '#FF0000';
+                    document.getElementById('timer-display').classList.add('pulse-anim');
+                } else if (timeRemaining <= 10) {
+                    document.getElementById('timer-display').style.color = '#FFA500';
                 }
-                setTimeout(() => showCorrection(), 1000);
-            }
-        });
-    });
-}
 
-// Jouer le son de klaxon
-function playHornSound() {
-    const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hZFQlMouLvuWgiCTGH0fPTgjMGHm7A7+OZUQ0PVKzn77NgGAg+ltry0XwpBSp+zO/ajEIJE2C18NBuJAIygdLy0n0qBSp+zO/bfSkFKoLS8tJ9KgUqftLv2n0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2X0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2n0pBSqB0vLSfSkFKoLS8tJ9KgUqftLv2X0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2n0pBSqC0vLRfSoFKoLS8tJ9KgUqftLv2n0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2n0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2X0qBSqC0vLSfSkFKoLS8tJ9KgUqftLv2n0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2X0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2n0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2X0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2n0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2X0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2n0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2X0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2n0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv');
-    audio.play().catch(e => console.log('Son non joué:', e));
-}
-
-// Initialiser Firebase
-try {
-    firebase.initializeApp(firebaseConfig);
-    database = firebase.database();
-    console.log('✅ Firebase initialisé');
-} catch (error) {
-    console.error('❌ Erreur Firebase:', error);
-}
-
-// Générer UUID unique
-function generateUUID() {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        const r = Math.random() * 16 | 0;
-        const v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-    });
-}
-
-// Base de données complète des questions SST (ordre réorganisé: DC4, DC1, DC2, DC3)
-const BOXES_DATA = [
-    {
-        title: 'DC4 - Prévention',
-        subtitle: 'Situations spécifiques et prévention',
-        icon: '🏥',
-        color: 'from-purple-500 to-pink-600',
-        games: [
-            { type: 'quiz', title: 'Rôle de prévention', question: 'En plus des secours, quel est l\'autre rôle majeur du SST ?', options: ['Nettoyer les lieux', 'Participer à la prévention des risques', 'Former les autres', 'Gérer la trousse'], correctAnswer: 1, explanation: 'Le SST participe activement à la prévention des risques professionnels dans son entreprise.' },
-            { type: 'quiz', title: 'DAE', question: 'Le SST peut-il utiliser un défibrillateur automatisé externe (DAE) ?', options: ['Non, formation spécifique requise', 'Oui, tout citoyen peut l\'utiliser', 'Seulement les pompiers', 'Sur prescription uniquement'], correctAnswer: 1, explanation: 'Tout citoyen, y compris les SST, peut utiliser un DAE. L\'appareil guide l\'utilisateur.' },
-            { type: 'true-false', title: 'Recyclage', question: 'Le certificat SST doit être recyclé tous les 2 ans.', options: ['Vrai', 'Faux'], correctAnswer: 0, explanation: 'VRAI - Le recyclage SST doit avoir lieu tous les 24 mois pour maintenir la validité du certificat.' },
-            { type: 'matching', title: 'Acteurs de prévention', question: 'Associez chaque acteur à son rôle :', pairs: [{ left: 'SST', right: 'Premiers secours et prévention' }, { left: 'Médecin du travail', right: 'Santé des salariés' }, { left: 'CHSCT/CSE', right: 'Représentation du personnel' }, { left: 'Employeur', right: 'Responsable sécurité' }], explanation: 'Chaque acteur a un rôle complémentaire dans la prévention des risques professionnels.' },
-            { type: 'sequence', title: 'Démarche de prévention', question: 'Remettez dans l\'ordre les étapes de la démarche de prévention :', items: ['Repérer le danger', 'Analyser les risques', 'Proposer des solutions', 'Informer et suivre'], correctOrder: [0, 1, 2, 3], explanation: 'La démarche de prévention suit une logique rigoureuse pour réduire efficacement les risques.' },
-            { type: 'quiz', title: 'Document unique', question: 'Le Document Unique d\'Évaluation des Risques (DUER) doit être mis à jour :', options: ['Tous les ans obligatoirement', 'En cas de modification importante ou nouvel équipement', 'Seulement en cas d\'accident grave', 'Tous les 5 ans'], correctAnswer: 1, explanation: 'Le DUER doit être mis à jour dès qu\'il y a une modification significative dans l\'entreprise.' }
-        ]
-    },
-    {
-        title: 'DC1 - Protéger',
-        subtitle: 'Situer son rôle et protéger',
-        icon: '🛡️',
-        color: 'from-blue-500 to-blue-700',
-        games: [
-            { type: 'quiz', title: 'Cadre juridique', question: 'Quel est le cadre juridique qui définit le rôle du SST ?', options: ['Code du Travail (Article R4224-15)', 'Code Civil', 'Code de la Santé Publique', 'Règlement Intérieur'], correctAnswer: 0, explanation: 'Le Code du Travail, article R4224-15, définit le rôle et les obligations du Sauveteur Secouriste du Travail.' },
-            { type: 'quiz', title: 'Rôle du SST', question: 'Quel est le rôle principal d\'un SST ?', options: ['Remplacer les services d\'urgence', 'Porter les premiers secours et prévenir les risques', 'Soigner toutes les blessures', 'Evacuer les victimes'], correctAnswer: 1, explanation: 'Le SST a un double rôle : porter secours en cas d\'accident ET participer à la prévention.' },
-            { type: 'quiz', title: 'Formation SST', question: 'Quelle est la durée de validité d\'un certificat SST ?', options: ['1 an', '2 ans', '3 ans', '5 ans'], correctAnswer: 1, explanation: 'Le certificat SST est valable 24 mois et doit être recyclé régulièrement.' },
-            { type: 'true-false', title: 'Médicaments', question: 'Un SST peut administrer des médicaments à une victime.', options: ['Vrai', 'Faux'], correctAnswer: 1, explanation: 'FAUX - Un SST ne peut jamais administrer de médicaments. C\'est un acte médical réservé aux professionnels de santé.' },
-            { type: 'sequence', title: 'Chaîne de secours', question: 'Remettez dans l\'ordre les étapes de la chaîne de secours :', items: ['Protéger', 'Examiner', 'Faire alerter / Alerter', 'Secourir'], correctOrder: [0, 1, 2, 3], explanation: 'La chaîne de secours suit toujours cet ordre : Protéger, Examiner, Faire Alerter/Alerter, puis Secourir.' },
-            { type: 'matching', title: 'Champ d\'intervention', question: 'Associez chaque action avec le bon intervenant :', pairs: [{ left: 'Porter les premiers secours', right: 'SST' }, { left: 'Prescrire un traitement', right: 'Médecin' }, { left: 'Protéger et alerter', right: 'SST' }, { left: 'Transport médicalisé', right: 'Secours spécialisés' }], explanation: 'Chaque intervenant a un rôle spécifique. Le SST ne peut pas prescrire de traitement ni faire de transport médicalisé.' },
-            { type: 'true-false', title: 'Prévention au quotidien', question: 'Un SST doit participer activement à la prévention des risques dans son entreprise.', options: ['Vrai', 'Faux'], correctAnswer: 0, explanation: 'VRAI - Le SST a un double rôle : porter secours en cas d\'accident ET contribuer à la prévention des risques professionnels au quotidien.' }
-        ]
-    },
-    {
-        title: 'DC2 - Examiner',
-        subtitle: 'Examiner la victime',
-        icon: '🔍',
-        color: 'from-green-500 to-green-700',
-        games: [
-            { type: 'quiz', title: 'Conscience', question: 'Comment vérifier la conscience d\'une victime ?', options: ['Lui poser une question et secouer les épaules', 'La gifler', 'Lui verser de l\'eau', 'Attendre qu\'elle se réveille'], correctAnswer: 0, explanation: 'On vérifie la conscience en posant une question simple et en secouant doucement les épaules de la victime.' },
-            { type: 'quiz', title: 'Hémorragie', question: 'Qu\'est-ce qu\'une hémorragie externe ?', options: ['Un saignement visible qui ne s\'arrête pas', 'Un hématome', 'Une égratignure', 'Un saignement de nez'], correctAnswer: 0, explanation: 'Une hémorragie externe est un saignement abondant et visible qui ne s\'arrête pas spontanément.' },
-            { type: 'true-false', title: 'Respiration et pouls', question: 'Pour vérifier la respiration, il suffit de prendre le pouls.', options: ['Vrai', 'Faux'], correctAnswer: 1, explanation: 'FAUX - La prise de pouls n\'est pas fiable. Il faut utiliser la méthode VES (Voir, Écouter, Sentir) pendant 10 secondes.' },
-            { type: 'sequence', title: 'Ordre d\'examen', question: 'Dans quel ordre examinez-vous une victime ?', items: ['Vérifier la conscience', 'Vérifier la respiration', 'Rechercher une hémorragie', 'Rechercher d\'autres signes'], correctOrder: [0, 1, 2, 3], explanation: 'L\'examen suit toujours cet ordre de priorité pour détecter les détresses vitales.' },
-            { type: 'matching', title: 'Signes et symptômes', question: 'Associez chaque signe avec sa catégorie :', pairs: [{ left: 'Ne répond pas', right: 'Inconscience' }, { left: 'Ventre qui se soulève', right: 'Respiration' }, { left: 'Saignement abondant', right: 'Hémorragie' }, { left: 'Brûlure, plaie', right: 'Autres signes' }], explanation: 'Chaque signe permet d\'identifier une détresse spécifique nécessitant une action appropriée.' },
-            { type: 'quiz', title: 'Position d\'attente', question: 'Une victime consciente qui a vomi doit être placée en quelle position ?', options: ['Sur le dos', 'En position latérale de sécurité (PLS)', 'Assise', 'Debout'], correctAnswer: 1, explanation: 'La PLS évite que la victime ne s\'étouffe avec ses vomissements ou sa langue.' }
-        ]
-    },
-    {
-        title: 'DC3 - Alerter & Secourir',
-        subtitle: 'Faire alerter et secourir',
-        icon: '🩹',
-        color: 'from-red-500 to-orange-600',
-        games: [
-            { type: 'quiz', title: 'Numéros d\'urgence', question: 'Quel numéro appeler pour un accident du travail avec victime grave ?', options: ['15 - SAMU', '17 - Police', '18 - Pompiers', '112 - Numéro européen'], correctAnswer: 0, explanation: 'Le 15 (SAMU) est le numéro à appeler pour toute urgence médicale.' },
-            { type: 'quiz', title: 'Arrêt cardiaque', question: 'Si vous êtes seul avec une victime en arrêt cardiaque, que faites-vous ?', options: ['Rester sans alerter', 'Alerter AVANT de réanimer', 'Attendre de l\'aide', 'Chercher un défibrillateur'], correctAnswer: 1, explanation: 'Il faut toujours alerter les secours avant de commencer la réanimation si on est seul.' },
-            { type: 'true-false', title: 'Numéro 112', question: 'Le numéro 112 fonctionne dans tous les pays de l\'UE.', options: ['Vrai', 'Faux'], correctAnswer: 0, explanation: 'VRAI - Le 112 est le numéro d\'urgence européen unique. Il est gratuit et accessible partout dans l\'UE.' },
-            { type: 'matching', title: 'Numéros d\'urgence', question: 'Associez chaque numéro à son service :', pairs: [{ left: '15', right: 'SAMU' }, { left: '18', right: 'Pompiers' }, { left: '112', right: 'Numéro européen' }, { left: '114', right: 'Sourds et malentendants' }], explanation: 'Connaître les numéros d\'urgence permet de contacter rapidement le bon service.' },
-            { type: 'sequence', title: 'Contenu de l\'alerte', question: 'Ordre des informations à donner aux secours :', items: ['Lieu exact et accès', 'Nature de l\'accident', 'Nombre et état des victimes', 'Gestes déjà effectués'], correctOrder: [0, 1, 2, 3], explanation: 'Suivre cet ordre permet de transmettre efficacement toutes les informations nécessaires aux secours.' },
-            { type: 'quiz', title: 'RCP', question: 'Lors d\'une RCP, quel est le ratio compressions/insufflations ?', options: ['15 compressions pour 2 insufflations', '30 compressions pour 2 insufflations', '10 compressions pour 1 insufflation', '5 compressions pour 1 insufflation'], correctAnswer: 1, explanation: 'Le ratio recommandé est de 30 compressions thoraciques pour 2 insufflations.' },
-            { type: 'true-false', title: 'Défibrillateur', question: 'Le défibrillateur automatisé externe (DAE) peut être utilisé par toute personne, même sans formation.', options: ['Vrai', 'Faux'], correctAnswer: 0, explanation: 'VRAI - Selon la loi, toute personne peut utiliser un DAE. L\'appareil donne des instructions vocales et ne délivrera un choc que si nécessaire.' }
-        ]
-    }
-];
-
-// Fonctions utilitaires
-function showScreen(screenId) {
-    document.querySelectorAll('#app > div').forEach(screen => screen.classList.add('hidden'));
-    document.getElementById(screenId).classList.remove('hidden');
-}
-
-function createConfetti() {
-    const colors = ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A'];
-    for (let i = 0; i < 50; i++) {
-        const confetti = document.createElement('div');
-        confetti.className = 'confetti';
-        confetti.style.position = 'fixed';
-        confetti.style.width = '10px';
-        confetti.style.height = '10px';
-        confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
-        confetti.style.left = Math.random() * window.innerWidth + 'px';
-        confetti.style.top = '-10px';
-        confetti.style.zIndex = '9999';
-        document.getElementById('confetti-container').appendChild(confetti);
-        setTimeout(() => confetti.remove(), 3000);
-    }
-}
-
-function getTeamEmoji(index) {
-    const emojis = ['🚒', '🚑', '⚡', '🛡️', '🔥', '💪', '🎯', '⭐', '🏆', '🚀'];
-    const numIndex = typeof index === 'string' ? parseInt(index.split('-').pop() || '0') : index;
-    return emojis[numIndex % emojis.length];
-}
-
-function showCustomAlert(message) {
-    const modal = document.createElement('div');
-    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
-    modal.innerHTML = `
-        <div class="glass-morphism p-8 rounded-2xl shadow-2xl max-w-md w-full mx-4 bounce-in">
-            <p class="text-gray-700 dark:text-gray-300 mb-6 text-center text-xl font-semibold">${message}</p>
-            <button class="w-full px-6 py-4 bg-gradient-to-r from-primary via-purple-600 to-pink-600 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-2xl transition-all" onclick="this.closest('.fixed').remove()">OK</button>
-        </div>
-    `;
-    document.body.appendChild(modal);
-}
-
-function showConfirmDialog(message, onConfirm) {
-    const modal = document.createElement('div');
-    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
-    modal.innerHTML = `
-        <div class="glass-morphism p-8 rounded-2xl shadow-2xl max-w-md w-full mx-4 bounce-in border-2 border-orange-500">
-            <p class="text-gray-700 dark:text-gray-300 mb-6 text-center text-xl font-semibold">${message}</p>
-            <div class="flex gap-3">
-                <button class="flex-1 px-6 py-4 bg-gray-500 hover:bg-gray-600 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-2xl transition-all" onclick="this.closest('.fixed').remove()">Annuler</button>
-                <button id="confirm-btn" class="flex-1 px-6 py-4 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-2xl transition-all">Confirmer</button>
-            </div>
-        </div>
-    `;
-    document.body.appendChild(modal);
-    modal.querySelector('#confirm-btn').addEventListener('click', () => {
-        modal.remove();
-        onConfirm();
-    });
-}
-
-// Randomiser les questions d'un coffre
-function getRandomizedGames(boxIndex) {
-    const allGames = [...BOXES_DATA[boxIndex].games];
-    // Mélanger l'array
-    for (let i = allGames.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [allGames[i], allGames[j]] = [allGames[j], allGames[i]];
-    }
-    // Retourner les 7 premières
-    return allGames.slice(0, 7);
-}
-
-// Connexion Superviseur
-document.getElementById('supervisor-login-form').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const password = document.getElementById('supervisor-password').value;
-    if (password === SUPERVISOR_PASSWORD) {
-        userRole = 'supervisor';
-        sessionId = 'session_' + generateUUID();
-        initializeSupervisor();
-    } else {
-        document.getElementById('login-error').classList.remove('hidden');
-        setTimeout(() => document.getElementById('login-error').classList.add('hidden'), 3000);
-    }
-});
-
-function initializeSupervisor() {
-    showScreen('supervisor-dashboard');
-    document.getElementById('session-id-display').textContent = sessionId;
-
-    const qrContainer = document.getElementById('qrcode-container');
-    qrContainer.innerHTML = '';
-    const traineeUrl = window.location.href.split('?')[0] + '?session=' + sessionId;
-    new QRCode(qrContainer, {
-        text: traineeUrl,
-        width: 256,
-        height: 256,
-        colorDark: '#5D5CDE',
-        colorLight: '#ffffff',
-        correctLevel: QRCode.CorrectLevel.H
-    });
-
-    database.ref('sessions/' + sessionId).set({
-        status: 'waiting',
-        currentBox: -1,
-        currentGameIndex: -1,
-        teams: {},
-        openedBoxes: [],
-        createdAt: Date.now()
-    });
-
-    database.ref('sessions/' + sessionId + '/teams').on('value', (snapshot) => {
-        updateTeamsList(snapshot.val());
-    });
-}
-
-function updateTeamsList(teams) {
-    const teamsList = document.getElementById('teams-list');
-    const teamsCount = document.getElementById('teams-count');
-
-    if (!teams || Object.keys(teams).length === 0) {
-        teamsList.innerHTML = '<div class="text-center text-gray-500 dark:text-gray-400">En attente des équipes...</div>';
-        teamsCount.textContent = '0';
-        return;
-    }
-
-    const teamsArray = Object.entries(teams);
-    teamsCount.textContent = teamsArray.length;
-
-    teamsList.innerHTML = teamsArray.map(([id, team]) => {
-        // DEBUG: Afficher les données de l'équipe
-        console.log('🔍 Équipe:', id, 'Données:', team);
-        const teamName = (team && team.name) ? team.name : 'undefined';
-        const teamScore = (team && team.score) ? team.score : 0;
-
-        return `
-        <div class="bg-white dark:bg-gray-700 p-4 rounded-lg shadow-lg text-center relative">
-            <button onclick="removeTeam('${id}')" class="absolute top-2 right-2 w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-full font-bold text-sm shadow-lg transition-all">✕</button>
-            <div class="text-3xl mb-2">${getTeamEmoji(id)}</div>
-            <div class="text-lg font-bold text-gray-800 dark:text-white">${teamName}</div>
-            <div class="text-sm text-gray-600 dark:text-gray-400">Score: ${teamScore} pts</div>
-        </div>
-    `;
-    }).join('');
-}
-
-window.removeTeam = function(teamId) {
-    showConfirmDialog('Voulez-vous vraiment supprimer cette équipe ?', () => {
-        database.ref('sessions/' + sessionId + '/teams/' + teamId).remove();
-    });
-}
-
-document.getElementById('start-game-btn').addEventListener('click', () => {
-    database.ref('sessions/' + sessionId + '/status').set('playing');
-    showBoxesScreen();
-});
-
-function showBoxesScreen() {
-    showScreen('boxes-screen');
-    database.ref('sessions/' + sessionId + '/openedBoxes').once('value', (snapshot) => {
-        openedBoxes = snapshot.val() || [];
-        renderBoxes();
-    });
-}
-
-function renderBoxes() {
-    const boxesContainer = document.getElementById('boxes-container');
-    boxesContainer.innerHTML = BOXES_DATA.map((box, index) => {
-        const isDisabled = openedBoxes.includes(index);
-        return `
-            <div class="glass-morphism rounded-3xl shadow-2xl p-8 text-center transform transition-all ${isDisabled ? 'box-disabled' : 'cursor-pointer hover:scale-105'}" onclick="${isDisabled ? '' : `openBox(${index})`}">
-                <div class="text-8xl mb-4 float">${box.icon}</div>
-                <h3 class="text-2xl font-bold text-gray-800 dark:text-white mb-2">${box.title}</h3>
-                <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">${box.subtitle}</p>
-                <div class="bg-gradient-to-r ${box.color} text-white px-6 py-3 rounded-xl font-bold text-lg mt-4">
-                    ${isDisabled ? '✅ Terminé' : '7 questions'}
-                </div>
-            </div>
-        `;
-    }).join('');
-}
-
-window.openBox = function(boxIndex) {
-    currentBox = boxIndex;
-    currentGameIndex = 0;
-
-    const randomizedGames = getRandomizedGames(boxIndex);
-
-    database.ref('sessions/' + sessionId).update({
-        currentBox: boxIndex,
-        currentGameIndex: 0,
-        gameStatus: 'question',
-        randomizedGames: randomizedGames
-    });
-
-    loadGame();
-}
-
-function loadGame() {
-    console.log('🔄 Question', currentGameIndex);
-
-    // Nettoyer TOUS les listeners pour éviter l'accumulation
-    cleanupAllListeners();
-
-    // Charger la question
-    database.ref('sessions/' + sessionId + '/randomizedGames').once('value', (snapshot) => {
-        const games = snapshot.val();
-        if (!games || !games[currentGameIndex]) return;
-
-        const game = games[currentGameIndex];
-
-        // 🔥 IMPORTANT: Réinitialiser les flags de réponse pour CHAQUE question
-        resetAnswersFlags().then(() => {
-            console.log('✅ Flags hasAnswered réinitialisés');
-
-            // Réinitialiser le compteur à 0 et charger la question
-            return database.ref('sessions/' + sessionId).update({
-                answersCount: 0,
-                currentGame: game,
-                currentGameIndex: currentGameIndex,
-                gameStatus: 'question',
-                questionTimestamp: Date.now()
-            });
-        }).then(() => {
-            showProjectorQuestion(game);
-            // ATTENDRE 500ms pour que Firebase propage la réinitialisation du compteur
-            setTimeout(() => {
-                startAnswersCountListener();
-                console.log('✅ Question prête - Listener actif!');
-            }, 500);
-        });
-    });
-}
-
-function startAnswersCountListener() {
-    // Compter combien d'équipes il y a
-    database.ref('sessions/' + sessionId + '/teams').once('value', (snapshot) => {
-        const teams = snapshot.val();
-        if (!teams) return;
-
-        const totalTeams = Object.keys(teams).length;
-        console.log('👥 Total équipes:', totalTeams);
-
-        // Écouter le compteur de réponses
-        answersListener = (snapshot) => {
-            const count = snapshot.val() || 0;
-            console.log('📊 Réponses:', count, '/', totalTeams);
-
-            document.getElementById('answered-count').textContent = count;
-            document.getElementById('total-teams-count').textContent = totalTeams;
-
-            // Si tout le monde a répondu
-            if (count === totalTeams && count > 0) {
-                console.log('✅ Tous ont répondu!');
-                database.ref('sessions/' + sessionId + '/answersCount').off('value', answersListener);
-                answersListener = null;
-                setTimeout(() => showCorrection(), 1000);
-            }
-        };
-
-        database.ref('sessions/' + sessionId + '/answersCount').on('value', answersListener);
-    });
-}
-
-function resetAnswersFlags() {
-    return database.ref('sessions/' + sessionId + '/teams').once('value').then((snapshot) => {
-        const teams = snapshot.val();
-        if (!teams) return Promise.resolve();
-
-        const updates = {};
-        Object.keys(teams).forEach(id => {
-            updates['sessions/' + sessionId + '/teams/' + id + '/hasAnswered'] = false;
-            updates['sessions/' + sessionId + '/teams/' + id + '/answer'] = null;
-            updates['sessions/' + sessionId + '/teams/' + id + '/isCorrect'] = false;
-            updates['sessions/' + sessionId + '/teams/' + id + '/lastPoints'] = 0; // Réinitialiser aussi les points
-        });
-
-        console.log('🔄 Réinitialisation des flags pour', Object.keys(teams).length, 'équipes');
-        return database.ref().update(updates);
-    });
-}
-
-function showProjectorQuestion(game) {
-    showScreen('projector-question');
-    document.getElementById('projector-game-icon').textContent = getGameIcon(game.type);
-    document.getElementById('projector-question-text').textContent = game.question;
-
-    const container = document.getElementById('projector-game-container');
-    container.innerHTML = renderGameForProjector(game);
-
-    // Démarrer le timer de 30 secondes
-    startQuestionTimer();
-
-    // Le listener est activé dans loadGame() après réinitialisation du compteur
-}
-
-function getGameIcon(type) {
-    const icons = { 'quiz': '❓', 'true-false': '✓✗', 'sequence': '🔢', 'matching': '🔗' };
-    return icons[type] || '🎯';
-}
-
-function renderGameForProjector(game) {
-    if (game.type === 'quiz' || game.type === 'true-false') {
-        return `
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                ${game.options.map((opt, i) => `
-                    <div class="bg-gradient-to-r from-blue-500 to-cyan-600 text-white p-6 rounded-xl text-xl font-bold text-center">
-                        ${String.fromCharCode(65 + i)}. ${opt}
-                    </div>
-                `).join('')}
-            </div>
-        `;
-    } else if (game.type === 'sequence') {
-        return `
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                ${game.items.map((item, i) => `
-                    <div class="bg-gradient-to-r from-purple-500 to-pink-600 text-white p-6 rounded-xl text-xl font-bold text-center">
-                        ${i + 1}. ${item}
-                    </div>
-                `).join('')}
-            </div>
-        `;
-    } else if (game.type === 'matching') {
-        return `
-            <div class="grid grid-cols-2 gap-8">
-                <div class="space-y-4">
-                    ${game.pairs.map((pair, i) => `
-                        <div class="bg-gradient-to-r from-blue-500 to-cyan-600 text-white p-4 rounded-xl text-lg font-bold text-center">
-                            ${pair.left}
-                        </div>
-                    `).join('')}
-                </div>
-                <div class="space-y-4">
-                    ${game.pairs.map((pair, i) => `
-                        <div class="bg-gradient-to-r from-purple-500 to-pink-600 text-white p-4 rounded-xl text-lg font-bold text-center">
-                            ${pair.right}
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-    }
-}
-
-// Cette fonction n'est plus utilisée - remplacée par startAnswersCountListener
-
-function showCorrection() {
-    database.ref('sessions/' + sessionId + '/randomizedGames').once('value', (snapshot) => {
-        const games = snapshot.val();
-        const game = games[currentGameIndex];
-
-        showScreen('projector-correction');
-        document.getElementById('projector-explanation').textContent = game.explanation || 'Bonne réponse !';
-
-        const container = document.getElementById('projector-correction-content');
-        container.innerHTML = renderCorrection(game);
-
-        calculateAndUpdateScores(game);
-        database.ref('sessions/' + sessionId + '/gameStatus').set('correction');
-    });
-}
-
-function renderCorrection(game) {
-    if (game.type === 'quiz' || game.type === 'true-false') {
-        return `
-            <div class="space-y-3">
-                ${game.options.map((opt, i) => `
-                    <div class="p-4 rounded-xl text-lg font-bold ${i === game.correctAnswer ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' : 'bg-gray-100 dark:bg-gray-700'}">
-                        ${i === game.correctAnswer ? '✓' : ''} ${String.fromCharCode(65 + i)}. ${opt}
-                    </div>
-                `).join('')}
-            </div>
-        `;
-    } else if (game.type === 'sequence') {
-        return `
-            <div class="space-y-3">
-                ${game.items.map((item, i) => `
-                    <div class="bg-green-100 dark:bg-green-900 p-4 rounded-xl text-lg font-bold text-green-800 dark:text-green-200">
-                        ${i + 1}. ${item}
-                    </div>
-                `).join('')}
-            </div>
-        `;
-    } else if (game.type === 'matching') {
-        return `
-            <div class="space-y-3">
-                ${game.pairs.map((pair, i) => `
-                    <div class="bg-green-100 dark:bg-green-900 p-4 rounded-xl text-lg font-bold text-green-800 dark:text-green-200">
-                        ✓ ${pair.left} → ${pair.right}
-                    </div>
-                `).join('')}
-            </div>
-        `;
-    }
-}
-
-function calculateAndUpdateScores(game) {
-    database.ref('sessions/' + sessionId + '/teams').once('value', (snapshot) => {
-        const teams = snapshot.val();
-        if (!teams) return;
-
-        Object.entries(teams).forEach(([id, team]) => {
-            let points = 0;
-            if (team.isCorrect) {
-                points = 150;
-            }
-            const newScore = (team.score || 0) + points;
-            database.ref('sessions/' + sessionId + '/teams/' + id).update({
-                score: newScore,
-                lastPoints: points
-            });
-        });
-    });
-}
-
-document.getElementById('next-question-btn').addEventListener('click', () => {
-    currentGameIndex++;
-    console.log('📍 Passage à la question:', currentGameIndex);
-
-    database.ref('sessions/' + sessionId + '/randomizedGames').once('value', (snapshot) => {
-        const games = snapshot.val();
-
-        if (!games) {
-            console.error('❌ Pas de jeux trouvés!');
-            return;
+                if (timeRemaining <= 0) {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                    handleTimeUp();
+                }
+            }, 1000);
         }
 
-        console.log('📊 Questions dans ce coffre:', games.length, 'Question actuelle:', currentGameIndex);
+        // Quand le temps est écoulé
+        function handleTimeUp() {
+            console.log('⏰ Temps écoulé!');
+            playHornSound();
 
-        // Vérifier si on a terminé les 7 questions du coffre
-        if (currentGameIndex >= games.length) {
-            console.log('✅ Coffre terminé! Coffre:', currentBox);
+            database.ref('sessions/' + sessionId + '/teams').once('value', (snapshot) => {
+                const teams = snapshot.val();
+                if (!teams) return;
 
-            // Marquer le coffre comme terminé
-            if (!openedBoxes.includes(currentBox)) {
-                openedBoxes.push(currentBox);
+                const updates = {};
+                let nonRespondantsCount = 0;
+                const totalTeams = Object.keys(teams).length;
+
+                Object.entries(teams).forEach(([id, team]) => {
+                    if (!team.hasAnswered) {
+                        updates['sessions/' + sessionId + '/teams/' + id + '/hasAnswered'] = true;
+                        updates['sessions/' + sessionId + '/teams/' + id + '/answer'] = null;
+                        updates['sessions/' + sessionId + '/teams/' + id + '/isCorrect'] = false;
+                        updates['sessions/' + sessionId + '/teams/' + id + '/lastPoints'] = 0;
+                        nonRespondantsCount++;
+                    }
+                });
+
+                console.log('📊 Non-répondants:', nonRespondantsCount, '/', totalTeams);
+
+                if (Object.keys(updates).length > 0) {
+                    database.ref().update(updates).then(() => {
+                        const countRef = database.ref('sessions/' + sessionId + '/answersCount');
+                        return countRef.transaction((currentCount) => {
+                            return (currentCount || 0) + nonRespondantsCount;
+                        });
+                    }).then(() => {
+                        checkIfAllAnswered();
+                    });
+                } else {
+                    console.log('✅ Tout le monde avait répondu');
+                    if (answersListener) {
+                        database.ref('sessions/' + sessionId + '/answersCount').off('value', answersListener);
+                        answersListener = null;
+                    }
+                    setTimeout(() => showCorrection(), 1000);
+                }
+            });
+        }
+
+        // Vérifier si toutes les équipes ont répondu
+        function checkIfAllAnswered() {
+            database.ref('sessions/' + sessionId + '/teams').once('value', (teamsSnapshot) => {
+                const teams = teamsSnapshot.val();
+                if (!teams) return;
+
+                const totalTeams = Object.keys(teams).length;
+
+                database.ref('sessions/' + sessionId + '/answersCount').once('value', (countSnapshot) => {
+                    const count = countSnapshot.val() || 0;
+                    console.log('🔍 Vérification réponses:', count, '/', totalTeams);
+
+                    if (count >= totalTeams && totalTeams > 0) {
+                        console.log('✅ Tous ont répondu après timeout - passage correction');
+                        if (answersListener) {
+                            database.ref('sessions/' + sessionId + '/answersCount').off('value', answersListener);
+                            answersListener = null;
+                        }
+                        setTimeout(() => showCorrection(), 1000);
+                    }
+                });
+            });
+        }
+
+        // Jouer le son de klaxon
+        function playHornSound() {
+            const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hZFQlMouLvuWgiCTGH0fPTgjMGHm7A7+OZUQ0PVKzn77NgGAg+ltry0XwpBSp+zO/ajEIJE2C18NBuJAIygdLy0n0qBSp+zO/bfSkFKoLS8tJ9KgUqftLv2n0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2X0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2n0pBSqB0vLSfSkFKoLS8tJ9KgUqftLv2X0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2n0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2X0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2n0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2X0qBSqC0vLSfSkFKoLS8tJ9KgUqftLv2n0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2X0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2n0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2X0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2n0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv');
+            audio.play().catch(e => console.log('Son non joué:', e));
+        }
+
+        // Initialiser Firebase
+        try {
+            firebase.initializeApp(firebaseConfig);
+            database = firebase.database();
+            console.log('✅ Firebase initialisé');
+        } catch (error) {
+            console.error('❌ Erreur Firebase:', error);
+        }
+
+        // Générer UUID unique
+        function generateUUID() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0;
+                const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+
+        // Base de données des questions SST
+        const BOXES_DATA = [
+            {
+                title: 'DC4 - Prévention',
+                subtitle: 'Situations spécifiques et prévention',
+                icon: '🏥',
+                color: 'from-purple-500 to-pink-600',
+                games: [
+                    { type: 'quiz', title: 'Rôle de prévention', question: 'En plus des secours, quel est l\'autre rôle majeur du SST ?', options: ['Nettoyer les lieux', 'Participer à la prévention des risques', 'Former les autres', 'Gérer la trousse'], correctAnswer: 1, explanation: 'Le SST participe activement à la prévention des risques professionnels dans son entreprise.' },
+                    { type: 'quiz', title: 'DAE', question: 'Le SST peut-il utiliser un défibrillateur automatisé externe (DAE) ?', options: ['Non, formation spécifique requise', 'Oui, tout citoyen peut l\'utiliser', 'Seulement les pompiers', 'Sur prescription uniquement'], correctAnswer: 1, explanation: 'Tout citoyen, y compris les SST, peut utiliser un DAE. L\'appareil guide l\'utilisateur.' },
+                    { type: 'true-false', title: 'Recyclage', question: 'Le certificat SST doit être recyclé tous les 2 ans.', options: ['Vrai', 'Faux'], correctAnswer: 0, explanation: 'VRAI - Le recyclage SST doit avoir lieu tous les 24 mois pour maintenir la validité du certificat.' },
+                    { type: 'matching', title: 'Acteurs de prévention', question: 'Associez chaque acteur à son rôle :', pairs: [{ left: 'SST', right: 'Premiers secours et prévention' }, { left: 'Médecin du travail', right: 'Santé des salariés' }, { left: 'CHSCT/CSE', right: 'Représentation du personnel' }, { left: 'Employeur', right: 'Responsable sécurité' }], explanation: 'Chaque acteur a un rôle complémentaire dans la prévention des risques professionnels.' },
+                    { type: 'sequence', title: 'Démarche de prévention', question: 'Remettez dans l\'ordre les étapes de la démarche de prévention :', items: ['Repérer le danger', 'Analyser les risques', 'Proposer des solutions', 'Informer et suivre'], correctOrder: [0, 1, 2, 3], explanation: 'La démarche de prévention suit une logique rigoureuse pour réduire efficacement les risques.' },
+                    { type: 'quiz', title: 'Document unique', question: 'Le Document Unique d\'Évaluation des Risques (DUER) doit être mis à jour :', options: ['Tous les ans obligatoirement', 'En cas de modification importante ou nouvel équipement', 'Seulement en cas d\'accident grave', 'Tous les 5 ans'], correctAnswer: 1, explanation: 'Le DUER doit être mis à jour dès qu\'il y a une modification significative dans l\'entreprise.' },
+                    { type: 'quiz', title: 'Signalisation', question: 'Qu\'indique un pictogramme jaune et noir sur la signalisation ?', options: ['Danger immédiat', 'Zone interdite', 'Avertissement de danger', 'Obligation'], correctAnswer: 2, explanation: 'Le jaune et noir est utilisé pour avertir d\'un danger potentiel en matière de sécurité.' }
+                ]
+            },
+            {
+                title: 'DC1 - Protéger',
+                subtitle: 'Situer son rôle et protéger',
+                icon: '🛡️',
+                color: 'from-blue-500 to-blue-700',
+                games: [
+                    { type: 'quiz', title: 'Cadre juridique', question: 'Quel est le cadre juridique qui définit le rôle du SST ?', options: ['Code du Travail (Article R4224-15)', 'Code Civil', 'Code de la Santé Publique', 'Règlement Intérieur'], correctAnswer: 0, explanation: 'Le Code du Travail, article R4224-15, définit le rôle et les obligations du Sauveteur Secouriste du Travail.' },
+                    { type: 'quiz', title: 'Rôle du SST', question: 'Quel est le rôle principal d\'un SST ?', options: ['Remplacer les services d\'urgence', 'Porter les premiers secours et prévenir les risques', 'Soigner toutes les blessures', 'Evacuer les victimes'], correctAnswer: 1, explanation: 'Le SST a un double rôle : porter secours en cas d\'accident ET participer à la prévention.' },
+                    { type: 'quiz', title: 'Formation SST', question: 'Quelle est la durée de validité d\'un certificat SST ?', options: ['1 an', '2 ans', '3 ans', '5 ans'], correctAnswer: 1, explanation: 'Le certificat SST est valable 24 mois et doit être recyclé régulièrement.' },
+                    { type: 'true-false', title: 'Médicaments', question: 'Un SST peut administrer des médicaments à une victime.', options: ['Vrai', 'Faux'], correctAnswer: 1, explanation: 'FAUX - Un SST ne peut jamais administrer de médicaments. C\'est un acte médical réservé aux professionnels de santé.' },
+                    { type: 'sequence', title: 'Chaîne de secours', question: 'Remettez dans l\'ordre les étapes de la chaîne de secours :', items: ['Protéger', 'Examiner', 'Faire alerter / Alerter', 'Secourir'], correctOrder: [0, 1, 2, 3], explanation: 'La chaîne de secours suit toujours cet ordre : Protéger, Examiner, Faire Alerter/Alerter, puis Secourir.' },
+                    { type: 'matching', title: 'Champ d\'intervention', question: 'Associez chaque action avec le bon intervenant :', pairs: [{ left: 'Porter les premiers secours', right: 'SST' }, { left: 'Prescrire un traitement', right: 'Médecin' }, { left: 'Protéger et alerter', right: 'SST' }, { left: 'Transport médicalisé', right: 'Secours spécialisés' }], explanation: 'Chaque intervenant a un rôle spécifique. Le SST ne peut pas prescrire de traitement ni faire de transport médicalisé.' },
+                    { type: 'true-false', title: 'Prévention au quotidien', question: 'Un SST doit participer activement à la prévention des risques dans son entreprise.', options: ['Vrai', 'Faux'], correctAnswer: 0, explanation: 'VRAI - Le SST a un double rôle : porter secours en cas d\'accident ET contribuer à la prévention des risques professionnels au quotidien.' }
+                ]
+            },
+            {
+                title: 'DC2 - Examiner',
+                subtitle: 'Examiner la victime',
+                icon: '🔍',
+                color: 'from-green-500 to-green-700',
+                games: [
+                    { type: 'quiz', title: 'Conscience', question: 'Comment vérifier la conscience d\'une victime ?', options: ['Lui poser une question et secouer les épaules', 'La gifler', 'Lui verser de l\'eau', 'Attendre qu\'elle se réveille'], correctAnswer: 0, explanation: 'On vérifie la conscience en posant une question simple et en secouant doucement les épaules de la victime.' },
+                    { type: 'quiz', title: 'Hémorragie', question: 'Qu\'est-ce qu\'une hémorragie externe ?', options: ['Un saignement visible qui ne s\'arrête pas', 'Un hématome', 'Une égratignure', 'Un saignement de nez'], correctAnswer: 0, explanation: 'Une hémorragie externe est un saignement abondant et visible qui ne s\'arrête pas spontanément.' },
+                    { type: 'true-false', title: 'Respiration et pouls', question: 'Pour vérifier la respiration, il suffit de prendre le pouls.', options: ['Vrai', 'Faux'], correctAnswer: 1, explanation: 'FAUX - La prise de pouls n\'est pas fiable. Il faut utiliser la méthode VES (Voir, Écouter, Sentir) pendant 10 secondes.' },
+                    { type: 'sequence', title: 'Ordre d\'examen', question: 'Dans quel ordre examinez-vous une victime ?', items: ['Vérifier la conscience', 'Vérifier la respiration', 'Rechercher une hémorragie', 'Rechercher d\'autres signes'], correctOrder: [0, 1, 2, 3], explanation: 'L\'examen suit toujours cet ordre de priorité pour détecter les détresses vitales.' },
+                    { type: 'matching', title: 'Signes et symptômes', question: 'Associez chaque signe avec sa catégorie :', pairs: [{ left: 'Ne répond pas', right: 'Inconscience' }, { left: 'Ventre qui se soulève', right: 'Respiration' }, { left: 'Saignement abondant', right: 'Hémorragie' }, { left: 'Brûlure, plaie', right: 'Autres signes' }], explanation: 'Chaque signe permet d\'identifier une détresse spécifique nécessitant une action appropriée.' },
+                    { type: 'quiz', title: 'Position d\'attente', question: 'Une victime consciente qui a vomi doit être placée en quelle position ?', options: ['Sur le dos', 'En position latérale de sécurité (PLS)', 'Assise', 'Debout'], correctAnswer: 1, explanation: 'La PLS évite que la victime ne s\'étouffe avec ses vomissements ou sa langue.' },
+                    { type: 'true-false', title: 'Température', question: 'On doit vérifier la température corporelle d\'une victime ayant subi un choc.', options: ['Vrai', 'Faux'], correctAnswer: 1, explanation: 'FAUX - Ce n\'est pas une priorité. On se concentre sur la conscience, la respiration et les hémorragies.' }
+                ]
+            },
+            {
+                title: 'DC3 - Alerter & Secourir',
+                subtitle: 'Faire alerter et secourir',
+                icon: '🩹',
+                color: 'from-red-500 to-orange-600',
+                games: [
+                    { type: 'quiz', title: 'Numéros d\'urgence', question: 'Quel numéro appeler pour un accident du travail avec victime grave ?', options: ['15 - SAMU', '17 - Police', '18 - Pompiers', '112 - Numéro européen'], correctAnswer: 0, explanation: 'Le 15 (SAMU) est le numéro à appeler pour toute urgence médicale.' },
+                    { type: 'quiz', title: 'Arrêt cardiaque', question: 'Si vous êtes seul avec une victime en arrêt cardiaque, que faites-vous ?', options: ['Rester sans alerter', 'Alerter AVANT de réanimer', 'Attendre de l\'aide', 'Chercher un défibrillateur'], correctAnswer: 1, explanation: 'Il faut toujours alerter les secours avant de commencer la réanimation si on est seul.' },
+                    { type: 'true-false', title: 'Numéro 112', question: 'Le numéro 112 fonctionne dans tous les pays de l\'UE.', options: ['Vrai', 'Faux'], correctAnswer: 0, explanation: 'VRAI - Le 112 est le numéro d\'urgence européen unique. Il est gratuit et accessible partout dans l\'UE.' },
+                    { type: 'matching', title: 'Numéros d\'urgence', question: 'Associez chaque numéro à son service :', pairs: [{ left: '15', right: 'SAMU' }, { left: '18', right: 'Pompiers' }, { left: '112', right: 'Numéro européen' }, { left: '114', right: 'Sourds et malentendants' }], explanation: 'Connaître les numéros d\'urgence permet de contacter rapidement le bon service.' },
+                    { type: 'sequence', title: 'Contenu de l\'alerte', question: 'Ordre des informations à donner aux secours :', items: ['Lieu exact et accès', 'Nature de l\'accident', 'Nombre et état des victimes', 'Gestes déjà effectués'], correctOrder: [0, 1, 2, 3], explanation: 'Suivre cet ordre permet de transmettre efficacement toutes les informations nécessaires aux secours.' },
+                    { type: 'quiz', title: 'RCP', question: 'Lors d\'une RCP, quel est le ratio compressions/insufflations ?', options: ['15 compressions pour 2 insufflations', '30 compressions pour 2 insufflations', '10 compressions pour 1 insufflation', '5 compressions pour 1 insufflation'], correctAnswer: 1, explanation: 'Le ratio recommandé est de 30 compressions thoraciques pour 2 insufflations.' },
+                    { type: 'true-false', title: 'Défibrillateur', question: 'Le défibrillateur automatisé externe (DAE) peut être utilisé par toute personne, même sans formation.', options: ['Vrai', 'Faux'], correctAnswer: 0, explanation: 'VRAI - Selon la loi, toute personne peut utiliser un DAE. L\'appareil donne des instructions vocales et ne délivrera un choc que si nécessaire.' }
+                ]
             }
-            database.ref('sessions/' + sessionId + '/openedBoxes').set(openedBoxes);
+        ];
 
-            // Vérifier si c'est le dernier coffre
-            if (currentBox < BOXES_DATA.length - 1) {
-                console.log('⏸️ Pause avant coffre suivant');
-                showPauseScreen();
+        // Fonctions utilitaires
+        function showScreen(screenId) {
+            document.querySelectorAll('#app > div').forEach(screen => screen.classList.add('hidden'));
+            document.getElementById(screenId).classList.remove('hidden');
+        }
+
+        function createConfetti() {
+            const colors = ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A'];
+            for (let i = 0; i < 50; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti';
+                confetti.style.position = 'fixed';
+                confetti.style.width = '10px';
+                confetti.style.height = '10px';
+                confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                confetti.style.left = Math.random() * window.innerWidth + 'px';
+                confetti.style.top = '-10px';
+                confetti.style.zIndex = '9999';
+                document.getElementById('confetti-container').appendChild(confetti);
+                setTimeout(() => confetti.remove(), 3000);
+            }
+        }
+
+        function getTeamEmoji(index) {
+            const emojis = ['🚒', '🚑', '⚡', '🛡️', '🔥', '💪', '🎯', '⭐', '🏆', '🚀'];
+            const numIndex = typeof index === 'string' ? parseInt(index.split('-').pop() || '0') : index;
+            return emojis[numIndex % emojis.length];
+        }
+
+        function showCustomAlert(message) {
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+            modal.innerHTML = `
+                <div class="glass-morphism p-8 rounded-2xl shadow-2xl max-w-md w-full mx-4 bounce-in">
+                    <p class="text-gray-700 dark:text-gray-300 mb-6 text-center text-xl font-semibold">${message}</p>
+                    <button class="w-full px-6 py-4 bg-gradient-to-r from-primary via-purple-600 to-pink-600 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-2xl transition-all" onclick="this.closest('.fixed').remove()">OK</button>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        function showConfirmDialog(message, onConfirm) {
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+            modal.innerHTML = `
+                <div class="glass-morphism p-8 rounded-2xl shadow-2xl max-w-md w-full mx-4 bounce-in border-2 border-orange-500">
+                    <p class="text-gray-700 dark:text-gray-300 mb-6 text-center text-xl font-semibold">${message}</p>
+                    <div class="flex gap-3">
+                        <button class="flex-1 px-6 py-4 bg-gray-500 hover:bg-gray-600 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-2xl transition-all" onclick="this.closest('.fixed').remove()">Annuler</button>
+                        <button id="confirm-btn" class="flex-1 px-6 py-4 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-2xl transition-all">Confirmer</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            modal.querySelector('#confirm-btn').addEventListener('click', () => {
+                modal.remove();
+                onConfirm();
+            });
+        }
+
+        // Randomiser les questions d'un coffre
+        function getRandomizedGames(boxIndex) {
+            const allGames = [...BOXES_DATA[boxIndex].games];
+            for (let i = allGames.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [allGames[i], allGames[j]] = [allGames[j], allGames[i]];
+            }
+            return allGames.slice(0, 7);
+        }
+
+        // === NOUVELLE FONCTION: Préparer le jeu avec réponses mélangées ===
+        function prepareGameWithShuffledAnswers(game) {
+            let shuffledGame = { ...game };
+
+            if (game.type === 'quiz' || game.type === 'true-false') {
+                const optionsWithIndex = game.options.map((opt, i) => ({ 
+                    text: opt, 
+                    originalIndex: i 
+                }));
+                
+                // Mélange Fisher-Yates
+                for (let i = optionsWithIndex.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [optionsWithIndex[i], optionsWithIndex[j]] = 
+                        [optionsWithIndex[j], optionsWithIndex[i]];
+                }
+                
+                shuffledGame.optionsWithIndex = optionsWithIndex;
+                shuffledGame.options = optionsWithIndex.map(o => o.text);
+            }
+            
+            else if (game.type === 'sequence') {
+                const itemsWithIndex = game.items.map((item, i) => ({
+                    text: item,
+                    originalIndex: i
+                }));
+                
+                for (let i = itemsWithIndex.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [itemsWithIndex[i], itemsWithIndex[j]] = 
+                        [itemsWithIndex[j], itemsWithIndex[i]];
+                }
+                
+                shuffledGame.itemsWithIndex = itemsWithIndex;
+                shuffledGame.items = itemsWithIndex.map(i => i.text);
+            }
+            
+            else if (game.type === 'matching') {
+                const pairsLeft = game.pairs.map((p, i) => ({
+                    text: p.left,
+                    originalIndex: i,
+                    side: 'left'
+                }));
+                
+                const pairsRight = game.pairs.map((p, i) => ({
+                    text: p.right,
+                    originalIndex: i,
+                    side: 'right'
+                }));
+                
+                // Mélanger gauche
+                for (let i = pairsLeft.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [pairsLeft[i], pairsLeft[j]] = [pairsLeft[j], pairsLeft[i]];
+                }
+                
+                // Mélanger droite
+                for (let i = pairsRight.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [pairsRight[i], pairsRight[j]] = [pairsRight[j], pairsRight[i]];
+                }
+                
+                shuffledGame.pairsLeft = pairsLeft;
+                shuffledGame.pairsRight = pairsRight;
+            }
+
+            return shuffledGame;
+        }
+
+        // Connexion Superviseur
+        document.getElementById('supervisor-login-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const password = document.getElementById('supervisor-password').value;
+            if (password === SUPERVISOR_PASSWORD) {
+                userRole = 'supervisor';
+                sessionId = 'session_' + generateUUID();
+                initializeSupervisor();
             } else {
-                console.log('🏆 Tous les coffres terminés - Podium!');
-                showPodium();
+                document.getElementById('login-error').classList.remove('hidden');
+                setTimeout(() => document.getElementById('login-error').classList.add('hidden'), 3000);
             }
-        } else {
-            console.log('➡️ Question suivante dans le même coffre');
+        });
+
+        function initializeSupervisor() {
+            showScreen('supervisor-dashboard');
+            document.getElementById('session-id-display').textContent = sessionId;
+
+            const qrContainer = document.getElementById('qrcode-container');
+            qrContainer.innerHTML = '';
+            const traineeUrl = window.location.href.split('?')[0] + '?session=' + sessionId;
+            new QRCode(qrContainer, {
+                text: traineeUrl,
+                width: 256,
+                height: 256,
+                colorDark: '#5D5CDE',
+                colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.H
+            });
+
+            database.ref('sessions/' + sessionId).set({
+                status: 'waiting',
+                currentBox: -1,
+                currentGameIndex: -1,
+                teams: {},
+                openedBoxes: [],
+                createdAt: Date.now()
+            });
+
+            database.ref('sessions/' + sessionId + '/teams').on('value', (snapshot) => {
+                updateTeamsList(snapshot.val());
+            });
+        }
+
+        function updateTeamsList(teams) {
+            const teamsList = document.getElementById('teams-list');
+            const teamsCount = document.getElementById('teams-count');
+
+            if (!teams || Object.keys(teams).length === 0) {
+                teamsList.innerHTML = '<div class="text-center text-gray-500 dark:text-gray-400">En attente des équipes...</div>';
+                teamsCount.textContent = '0';
+                return;
+            }
+
+            const teamsArray = Object.entries(teams);
+            teamsCount.textContent = teamsArray.length;
+
+            teamsList.innerHTML = teamsArray.map(([id, team]) => {
+                const teamName = (team && team.name) ? team.name : 'undefined';
+                const teamScore = (team && team.score) ? team.score : 0;
+
+                return `
+                <div class="bg-white dark:bg-gray-700 p-4 rounded-lg shadow-lg text-center relative">
+                    <button onclick="removeTeam('${id}')" class="absolute top-2 right-2 w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-full font-bold text-sm shadow-lg transition-all">✕</button>
+                    <div class="text-3xl mb-2">${getTeamEmoji(id)}</div>
+                    <div class="text-lg font-bold text-gray-800 dark:text-white">${teamName}</div>
+                    <div class="text-sm text-gray-600 dark:text-gray-400">Score: ${teamScore} pts</div>
+                </div>
+            `;
+            }).join('');
+        }
+
+        window.removeTeam = function(teamId) {
+            showConfirmDialog('Voulez-vous vraiment supprimer cette équipe ?', () => {
+                database.ref('sessions/' + sessionId + '/teams/' + teamId).remove();
+            });
+        }
+
+        document.getElementById('start-game-btn').addEventListener('click', () => {
+            database.ref('sessions/' + sessionId + '/status').set('playing');
+            showBoxesScreen();
+        });
+
+        function showBoxesScreen() {
+            showScreen('boxes-screen');
+            database.ref('sessions/' + sessionId + '/openedBoxes').once('value', (snapshot) => {
+                openedBoxes = snapshot.val() || [];
+                renderBoxes();
+            });
+        }
+
+        function renderBoxes() {
+            const boxesContainer = document.getElementById('boxes-container');
+            boxesContainer.innerHTML = BOXES_DATA.map((box, index) => {
+                const isDisabled = openedBoxes.includes(index);
+                return `
+                    <div class="glass-morphism rounded-3xl shadow-2xl p-8 text-center transform transition-all ${isDisabled ? 'box-disabled' : 'cursor-pointer hover:scale-105'}" onclick="${isDisabled ? '' : `openBox(${index})`}">
+                        <div class="text-8xl mb-4 float">${box.icon}</div>
+                        <h3 class="text-2xl font-bold text-gray-800 dark:text-white mb-2">${box.title}</h3>
+                        <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">${box.subtitle}</p>
+                        <div class="bg-gradient-to-r ${box.color} text-white px-6 py-3 rounded-xl font-bold text-lg mt-4">
+                            ${isDisabled ? '✅ Terminé' : '7 questions'}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        window.openBox = function(boxIndex) {
+            currentBox = boxIndex;
+            currentGameIndex = 0;
+
+            const randomizedGames = getRandomizedGames(boxIndex);
+
+            database.ref('sessions/' + sessionId).update({
+                currentBox: boxIndex,
+                currentGameIndex: 0,
+                gameStatus: 'question',
+                randomizedGames: randomizedGames
+            });
+
             loadGame();
         }
-    });
-});
 
-function showPauseScreen() {
-    showScreen('pause-screen');
-    database.ref('sessions/' + sessionId + '/gameStatus').set('pause');
+        function loadGame() {
+            console.log('🔄 Question', currentGameIndex);
 
-    document.getElementById('pause-box-number').textContent = currentBox + 1;
-    document.getElementById('next-box-number').textContent = currentBox + 2;
+            cleanupAllListeners();
 
-    displayRanking('pause-ranking');
-}
+            database.ref('sessions/' + sessionId + '/randomizedGames').once('value', (snapshot) => {
+                const games = snapshot.val();
+                if (!games || !games[currentGameIndex]) return;
 
-document.getElementById('next-box-btn').addEventListener('click', () => {
-    database.ref('sessions/' + sessionId + '/gameStatus').set('boxes');
-    showBoxesScreen();
-});
+                let game = games[currentGameIndex];
+                
+                // 🔥 PRÉPARER LES RÉPONSES MÉLANGÉES ICI
+                const preparedGame = prepareGameWithShuffledAnswers(game);
 
-function displayRanking(containerId) {
-    database.ref('sessions/' + sessionId + '/teams').once('value', (snapshot) => {
-        const teams = snapshot.val();
-        if (!teams) return;
+                resetAnswersFlags().then(() => {
+                    console.log('✅ Flags hasAnswered réinitialisés');
 
-        const teamsArray = Object.entries(teams).map(([id, team]) => ({
-            id,
-            name: team && team.name ? team.name : 'Équipe inconnue',
-            score: team && team.score ? team.score : 0
-        })).sort((a, b) => b.score - a.score);
-
-        const container = document.getElementById(containerId);
-        container.innerHTML = teamsArray.map((team, i) => `
-            <div class="flex items-center justify-between p-4 ${i < 3 ? 'bg-gradient-to-r from-yellow-100 to-yellow-200 dark:from-yellow-900 dark:to-yellow-800' : 'bg-gray-100 dark:bg-gray-700'} rounded-lg mb-2">
-                <div class="flex items-center gap-4">
-                    <div class="ranking-badge rank-${i < 3 ? i + 1 : 'other'}">${i + 1}</div>
-                    <div class="text-xl font-bold">${team.name}</div>
-                </div>
-                <div class="text-2xl font-bold text-primary">${team.score} pts</div>
-            </div>
-        `).join('');
-    });
-}
-
-function showPodium() {
-    showScreen('podium-screen');
-    database.ref('sessions/' + sessionId + '/gameStatus').set('finished');
-    createConfetti();
-
-    database.ref('sessions/' + sessionId + '/teams').once('value', (snapshot) => {
-        const teams = snapshot.val();
-        if (!teams) return;
-
-        const teamsArray = Object.entries(teams).map(([id, team]) => ({
-            id,
-            name: team && team.name ? team.name : 'Équipe inconnue',
-            score: team && team.score ? team.score : 0
-        })).sort((a, b) => b.score - a.score);
-
-        const podiumContainer = document.getElementById('podium-container');
-        podiumContainer.innerHTML = '';
-
-        if (teamsArray.length >= 2) {
-            podiumContainer.innerHTML += `
-                <div class="text-center"><div class="text-6xl mb-2">🥈</div><div class="bg-gradient-to-r from-gray-300 to-gray-400 text-white p-6 rounded-t-xl" style="height: 200px; display: flex; flex-direction: column; justify-content: center;"><div class="text-2xl font-bold">${teamsArray[1].name}</div><div class="text-4xl font-bold">${teamsArray[1].score} pts</div></div></div>
-            `;
+                    return database.ref('sessions/' + sessionId).update({
+                        answersCount: 0,
+                        currentGame: preparedGame, // ← SAUVEGARDER LE JEU AVEC LES RÉPONSES MÉLANGÉES
+                        currentGameIndex: currentGameIndex,
+                        gameStatus: 'question',
+                        questionTimestamp: Date.now()
+                    });
+                }).then(() => {
+                    showProjectorQuestion(preparedGame);
+                    setTimeout(() => {
+                        startAnswersCountListener();
+                        console.log('✅ Question prête - Listener actif!');
+                    }, 500);
+                });
+            });
         }
 
-        if (teamsArray.length >= 1) {
-            podiumContainer.innerHTML += `
-                <div class="text-center"><div class="text-8xl mb-2">🥇</div><div class="bg-gradient-to-r from-yellow-400 to-yellow-600 text-white p-8 rounded-t-xl" style="height: 300px; display: flex; flex-direction: column; justify-content: center;"><div class="text-3xl font-bold">${teamsArray[0].name}</div><div class="text-5xl font-bold">${teamsArray[0].score} pts</div></div></div>
-            `;
+        function resetAnswersFlags() {
+            return database.ref('sessions/' + sessionId + '/teams').once('value').then((snapshot) => {
+                const teams = snapshot.val();
+                if (!teams) return Promise.resolve();
+
+                const updates = {};
+                Object.keys(teams).forEach(id => {
+                    updates['sessions/' + sessionId + '/teams/' + id + '/hasAnswered'] = false;
+                    updates['sessions/' + sessionId + '/teams/' + id + '/answer'] = null;
+                    updates['sessions/' + sessionId + '/teams/' + id + '/isCorrect'] = false;
+                    updates['sessions/' + sessionId + '/teams/' + id + '/lastPoints'] = 0;
+                });
+
+                console.log('🔄 Réinitialisation des flags pour', Object.keys(teams).length, 'équipes');
+                return database.ref().update(updates);
+            });
         }
 
-        if (teamsArray.length >= 3) {
-            podiumContainer.innerHTML += `
-                <div class="text-center"><div class="text-6xl mb-2">🥉</div><div class="bg-gradient-to-r from-orange-400 to-orange-600 text-white p-4 rounded-t-xl" style="height: 150px; display: flex; flex-direction: column; justify-content: center;"><div class="text-xl font-bold">${teamsArray[2].name}</div><div class="text-3xl font-bold">${teamsArray[2].score} pts</div></div></div>
-            `;
+        function showProjectorQuestion(game) {
+            showScreen('projector-question');
+            document.getElementById('projector-game-icon').textContent = getGameIcon(game.type);
+            document.getElementById('projector-question-text').textContent = game.question;
+
+            const container = document.getElementById('projector-game-container');
+            container.innerHTML = renderGameForProjector(game);
+
+            startQuestionTimer();
         }
 
-        displayRanking('full-ranking-list');
-    });
-}
+        function getGameIcon(type) {
+            const icons = { 'quiz': '❓', 'true-false': '✓✗', 'sequence': '🔢', 'matching': '🔗' };
+            return icons[type] || '🎯';
+        }
 
-// Connexion Stagiaire - avec auto-reconnexion
-window.addEventListener('DOMContentLoaded', () => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const sessionParam = urlParams.get('session');
-    const teamParam = urlParams.get('team');
+        function renderGameForProjector(game) {
+            if (game.type === 'quiz' || game.type === 'true-false') {
+                return `
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        ${game.optionsWithIndex.map((opt, i) => `
+                            <div class="bg-gradient-to-r from-blue-500 to-cyan-600 text-white p-6 rounded-xl text-xl font-bold text-center">
+                                ${String.fromCharCode(65 + i)}. ${opt.text}
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            } else if (game.type === 'sequence') {
+                return `
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        ${game.itemsWithIndex.map((item, i) => `
+                            <div class="bg-gradient-to-r from-purple-500 to-pink-600 text-white p-6 rounded-xl text-xl font-bold text-center">
+                                ${i + 1}. ${item.text}
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            } else if (game.type === 'matching') {
+                return `
+                    <div class="grid grid-cols-2 gap-8">
+                        <div class="space-y-4">
+                            ${game.pairsLeft.map((pair, i) => `
+                                <div class="bg-gradient-to-r from-blue-500 to-cyan-600 text-white p-4 rounded-xl text-lg font-bold text-center">
+                                    ${pair.text}
+                                </div>
+                            `).join('')}
+                        </div>
+                        <div class="space-y-4">
+                            ${game.pairsRight.map((pair, i) => `
+                                <div class="bg-gradient-to-r from-purple-500 to-pink-600 text-white p-4 rounded-xl text-lg font-bold text-center">
+                                    ${pair.text}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+        }
 
-    if (sessionParam) {
-        sessionId = sessionParam;
+        function startAnswersCountListener() {
+            database.ref('sessions/' + sessionId + '/teams').once('value', (snapshot) => {
+                const teams = snapshot.val();
+                if (!teams) return;
 
-        // Tentative de reconnexion si teamId dans l'URL
-        if (teamParam) {
-            console.log('🔍 Tentative de reconnexion...', { sessionId: sessionParam, teamId: teamParam });
+                const totalTeams = Object.keys(teams).length;
+                console.log('👥 Total équipes:', totalTeams);
 
-            checkTeamExists(sessionParam, teamParam).then(teamData => {
-                if (teamData) {
-                    // L'équipe existe encore dans Firebase - reconnecter
-                    teamId = teamParam;
-                    reconnectToSession(sessionParam, teamParam, teamData);
+                answersListener = (snapshot) => {
+                    const count = snapshot.val() || 0;
+                    console.log('📊 Réponses:', count, '/', totalTeams);
+
+                    document.getElementById('answered-count').textContent = count;
+                    document.getElementById('total-teams-count').textContent = totalTeams;
+
+                    if (count === totalTeams && count > 0) {
+                        console.log('✅ Tous ont répondu!');
+                        database.ref('sessions/' + sessionId + '/answersCount').off('value', answersListener);
+                        answersListener = null;
+                        setTimeout(() => showCorrection(), 1000);
+                    }
+                };
+
+                database.ref('sessions/' + sessionId + '/answersCount').on('value', answersListener);
+            });
+        }
+
+        function showCorrection() {
+            database.ref('sessions/' + sessionId + '/randomizedGames').once('value', (snapshot) => {
+                const games = snapshot.val();
+                const game = games[currentGameIndex];
+
+                showScreen('projector-correction');
+                document.getElementById('projector-explanation').textContent = game.explanation || 'Bonne réponse !';
+
+                const container = document.getElementById('projector-correction-content');
+                container.innerHTML = renderCorrection(game);
+
+                calculateAndUpdateScores(game);
+                database.ref('sessions/' + sessionId + '/gameStatus').set('correction');
+            });
+        }
+
+        function renderCorrection(game) {
+            if (game.type === 'quiz' || game.type === 'true-false') {
+                return `
+                    <div class="space-y-3">
+                        ${game.optionsWithIndex.map((opt, i) => `
+                            <div class="p-4 rounded-xl text-lg font-bold ${opt.originalIndex === game.correctAnswer ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' : 'bg-gray-100 dark:bg-gray-700'}">
+                                ${opt.originalIndex === game.correctAnswer ? '✓' : ''} ${String.fromCharCode(65 + i)}. ${opt.text}
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            } else if (game.type === 'sequence') {
+                return `
+                    <div class="space-y-3">
+                        ${game.itemsWithIndex.map((item, i) => `
+                            <div class="bg-green-100 dark:bg-green-900 p-4 rounded-xl text-lg font-bold text-green-800 dark:text-green-200">
+                                ${i + 1}. ${item.text}
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            } else if (game.type === 'matching') {
+                return `
+                    <div class="space-y-3">
+                        ${game.pairsLeft.map((pair, i) => `
+                            <div class="bg-green-100 dark:bg-green-900 p-4 rounded-xl text-lg font-bold text-green-800 dark:text-green-200">
+                                ✓ ${pair.text} → ${game.pairsRight.find(r => r.originalIndex === pair.originalIndex).text}
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+        }
+
+        function calculateAndUpdateScores(game) {
+            database.ref('sessions/' + sessionId + '/teams').once('value', (snapshot) => {
+                const teams = snapshot.val();
+                if (!teams) return;
+
+                Object.entries(teams).forEach(([id, team]) => {
+                    let points = 0;
+                    if (team.isCorrect) {
+                        points = 150;
+                    }
+                    const newScore = (team.score || 0) + points;
+                    database.ref('sessions/' + sessionId + '/teams/' + id).update({
+                        score: newScore,
+                        lastPoints: points
+                    });
+                });
+            });
+        }
+
+        document.getElementById('next-question-btn').addEventListener('click', () => {
+            currentGameIndex++;
+            console.log('📍 Passage à la question:', currentGameIndex);
+
+            database.ref('sessions/' + sessionId + '/randomizedGames').once('value', (snapshot) => {
+                const games = snapshot.val();
+
+                if (!games) {
+                    console.error('❌ Pas de jeux trouvés!');
+                    return;
+                }
+
+                console.log('📊 Questions dans ce coffre:', games.length, 'Question actuelle:', currentGameIndex);
+
+                if (currentGameIndex >= games.length) {
+                    console.log('✅ Coffre terminé! Coffre:', currentBox);
+
+                    if (!openedBoxes.includes(currentBox)) {
+                        openedBoxes.push(currentBox);
+                    }
+                    database.ref('sessions/' + sessionId + '/openedBoxes').set(openedBoxes);
+
+                    if (currentBox < BOXES_DATA.length - 1) {
+                        console.log('⏸️ Pause avant coffre suivant');
+                        showPauseScreen();
+                    } else {
+                        console.log('🏆 Tous les coffres terminés - Podium!');
+                        showPodium();
+                    }
                 } else {
-                    // L'équipe n'existe plus - afficher login
-                    console.log('❌ Équipe inexistante, affichage login');
-                    clearSessionFromURL();
+                    console.log('➡️ Question suivante dans le même coffre');
+                    loadGame();
+                }
+            });
+        });
+
+        function showPauseScreen() {
+            showScreen('pause-screen');
+            database.ref('sessions/' + sessionId + '/gameStatus').set('pause');
+
+            document.getElementById('pause-box-number').textContent = currentBox + 1;
+            document.getElementById('next-box-number').textContent = currentBox + 2;
+
+            displayRanking('pause-ranking');
+        }
+
+        document.getElementById('next-box-btn').addEventListener('click', () => {
+            database.ref('sessions/' + sessionId + '/gameStatus').set('boxes');
+            showBoxesScreen();
+        });
+
+        function displayRanking(containerId) {
+            database.ref('sessions/' + sessionId + '/teams').once('value', (snapshot) => {
+                const teams = snapshot.val();
+                if (!teams) return;
+
+                const teamsArray = Object.entries(teams).map(([id, team]) => ({
+                    id,
+                    name: team && team.name ? team.name : 'Équipe inconnue',
+                    score: team && team.score ? team.score : 0
+                })).sort((a, b) => b.score - a.score);
+
+                const container = document.getElementById(containerId);
+                container.innerHTML = teamsArray.map((team, i) => `
+                    <div class="flex items-center justify-between p-4 ${i < 3 ? 'bg-gradient-to-r from-yellow-100 to-yellow-200 dark:from-yellow-900 dark:to-yellow-800' : 'bg-gray-100 dark:bg-gray-700'} rounded-lg mb-2">
+                        <div class="flex items-center gap-4">
+                            <div class="ranking-badge rank-${i < 3 ? i + 1 : 'other'}">${i + 1}</div>
+                            <div class="text-xl font-bold">${team.name}</div>
+                        </div>
+                        <div class="text-2xl font-bold text-primary">${team.score} pts</div>
+                    </div>
+                `).join('');
+            });
+        }
+
+        function showPodium() {
+            showScreen('podium-screen');
+            database.ref('sessions/' + sessionId + '/gameStatus').set('finished');
+            createConfetti();
+
+            database.ref('sessions/' + sessionId + '/teams').once('value', (snapshot) => {
+                const teams = snapshot.val();
+                if (!teams) return;
+
+                const teamsArray = Object.entries(teams).map(([id, team]) => ({
+                    id,
+                    name: team && team.name ? team.name : 'Équipe inconnue',
+                    score: team && team.score ? team.score : 0
+                })).sort((a, b) => b.score - a.score);
+
+                const podiumContainer = document.getElementById('podium-container');
+                podiumContainer.innerHTML = '';
+
+                if (teamsArray.length >= 2) {
+                    podiumContainer.innerHTML += `
+                        <div class="text-center"><div class="text-6xl mb-2">🥈</div><div class="bg-gradient-to-r from-gray-300 to-gray-400 text-white p-6 rounded-t-xl" style="height: 200px; display: flex; flex-direction: column; justify-content: center;"><div class="text-2xl font-bold">${teamsArray[1].name}</div><div class="text-4xl font-bold">${teamsArray[1].score} pts</div></div></div>
+                    `;
+                }
+
+                if (teamsArray.length >= 1) {
+                    podiumContainer.innerHTML += `
+                        <div class="text-center"><div class="text-8xl mb-2">🥇</div><div class="bg-gradient-to-r from-yellow-400 to-yellow-600 text-white p-8 rounded-t-xl" style="height: 300px; display: flex; flex-direction: column; justify-content: center;"><div class="text-3xl font-bold">${teamsArray[0].name}</div><div class="text-5xl font-bold">${teamsArray[0].score} pts</div></div></div>
+                    `;
+                }
+
+                if (teamsArray.length >= 3) {
+                    podiumContainer.innerHTML += `
+                        <div class="text-center"><div class="text-6xl mb-2">🥉</div><div class="bg-gradient-to-r from-orange-400 to-orange-600 text-white p-4 rounded-t-xl" style="height: 150px; display: flex; flex-direction: column; justify-content: center;"><div class="text-xl font-bold">${teamsArray[2].name}</div><div class="text-3xl font-bold">${teamsArray[2].score} pts</div></div></div>
+                    `;
+                }
+
+                displayRanking('full-ranking-list');
+            });
+        }
+
+        // Connexion Stagiaire - avec auto-reconnexion
+        window.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const sessionParam = urlParams.get('session');
+            const teamParam = urlParams.get('team');
+
+            if (sessionParam) {
+                sessionId = sessionParam;
+
+                if (teamParam) {
+                    console.log('🔍 Tentative de reconnexion...', { sessionId: sessionParam, teamId: teamParam });
+
+                    checkTeamExists(sessionParam, teamParam).then(teamData => {
+                        if (teamData) {
+                            teamId = teamParam;
+                            reconnectToSession(sessionParam, teamParam, teamData);
+                        } else {
+                            console.log('❌ Équipe inexistante, affichage login');
+                            clearSessionFromURL();
+                            userRole = 'trainee';
+                            showScreen('trainee-login');
+                        }
+                    }).catch(error => {
+                        console.error('❌ Erreur reconnexion:', error);
+                        userRole = 'trainee';
+                        showScreen('trainee-login');
+                    });
+                } else {
                     userRole = 'trainee';
                     showScreen('trainee-login');
                 }
-            }).catch(error => {
-                console.error('❌ Erreur reconnexion:', error);
-                userRole = 'trainee';
-                showScreen('trainee-login');
-            });
-        } else {
-            // Pas de teamId - nouvelle connexion
-            userRole = 'trainee';
-            showScreen('trainee-login');
-        }
-    }
-});
-
-document.getElementById('join-game-btn').addEventListener('click', () => {
-    teamName = document.getElementById('team-name-input').value.trim();
-
-    if (!teamName) {
-        showCustomAlert('Veuillez entrer un nom d\'équipe');
-        return;
-    }
-
-    teamId = 'team_' + generateUUID();
-
-    const teamRef = database.ref('sessions/' + sessionId + '/teams/' + teamId);
-
-    // Utiliser .set() pour créer l'équipe (UUID garantit l'unicité)
-    teamRef.set({
-        name: teamName,
-        score: 0,
-        hasAnswered: false,
-        joinedAt: Date.now()
-    }).then(() => {
-        console.log('✅ Équipe créée:', teamName, teamId);
-
-        // 🔥 IMPORTANT: Supprimer automatiquement l'équipe si le stagiaire se déconnecte
-        teamRef.onDisconnect().remove();
-        console.log('🔌 Listener de déconnexion activé pour:', teamName);
-
-        // 💾 Sauvegarder la session dans l'URL pour permettre la reconnexion
-        saveTraineeSessionToURL();
-
-        // 🔒 Activer la protection anti-scroll
-        enableTraineeScrollProtection();
-
-        showScreen('trainee-waiting');
-        document.getElementById('trainee-team-name-display').textContent = teamName;
-
-        database.ref('sessions/' + sessionId + '/status').on('value', (snapshot) => {
-            const status = snapshot.val();
-            if (status === 'playing') {
-                listenForGameUpdatesTrainee();
             }
         });
-    }).catch((error) => {
-        console.error('❌ Erreur création équipe:', error);
-        showCustomAlert('Erreur lors de la connexion. Réessayez.');
-    });
-});
 
-function listenForGameUpdatesTrainee() {
-    database.ref('sessions/' + sessionId + '/gameStatus').on('value', (snapshot) => {
-        const gameStatus = snapshot.val();
+        document.getElementById('join-game-btn').addEventListener('click', () => {
+            teamName = document.getElementById('team-name-input').value.trim();
 
-        if (gameStatus === 'question') {
-            database.ref('sessions/' + sessionId + '/currentGame').once('value', (snap) => {
-                const game = snap.val();
-                if (game) showTraineeGame(game);
-            });
-        } else if (gameStatus === 'correction') {
-            showTraineeResult();
-        } else if (gameStatus === 'pause' || gameStatus === 'boxes') {
-            showScreen('ranking-screen');
-            displayRanking('ranking-list');
-        } else if (gameStatus === 'finished') {
-            showPodium();
-        }
-    });
-}
-
-function showTraineeGame(game) {
-    showScreen('trainee-game');
-
-    document.getElementById('trainee-team-display').textContent = teamName;
-
-    database.ref('sessions/' + sessionId + '/teams/' + teamId + '/score').on('value', (snapshot) => {
-        const score = snapshot.val() || 0;
-        document.getElementById('trainee-score-display').textContent = score + ' pts';
-    });
-
-    const container = document.getElementById('trainee-game-container');
-    container.innerHTML = renderGameForTrainee(game);
-
-    selectedAnswer = null;
-    selectedSequence = [];
-    selectedMatching = [];
-
-    // Réactiver le bouton pour la nouvelle question
-    const btn = document.getElementById('trainee-validate-btn');
-    btn.disabled = false;
-    btn.textContent = '✓ Valider ma réponse';
-    btn.classList.remove('opacity-50', 'cursor-not-allowed');
-    btn.onclick = () => validateTraineeAnswer(game);
-}
-
-function renderGameForTrainee(game) {
-    if (game.type === 'quiz' || game.type === 'true-false') {
-        // Mélanger les options ET mémoriser les index originaux
-        const shuffledOptions = game.options.map((opt, i) => ({ text: opt, originalIndex: i }));
-
-        // Mélange Fisher-Yates
-        for (let i = shuffledOptions.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [shuffledOptions[i], shuffledOptions[j]] = [shuffledOptions[j], shuffledOptions[i]];
-        }
-
-        return `
-            <div class="text-2xl font-bold text-center mb-6 text-gray-800 dark:text-white">Choisissez votre réponse :</div>
-            <div class="grid grid-cols-1 gap-4">
-                ${shuffledOptions.map((item, displayIndex) => `
-                    <div class="answer-option bg-white dark:bg-gray-700 p-6 rounded-xl text-xl font-bold text-center shadow-lg" data-original-index="${item.originalIndex}" onclick="selectAnswer(${item.originalIndex})">
-                        ${String.fromCharCode(65 + displayIndex)}. ${item.text}
-                    </div>
-                `).join('')}
-            </div>
-        `;
-    } else if (game.type === 'sequence') {
-        // Mélanger les items de la séquence
-        const shuffledItems = game.items.map((item, i) => ({ text: item, originalIndex: i }));
-        for (let i = shuffledItems.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [shuffledItems[i], shuffledItems[j]] = [shuffledItems[j], shuffledItems[i]];
-        }
-
-        return `
-            <div class="text-2xl font-bold text-center mb-6 text-gray-800 dark:text-white">Cliquez dans l'ordre :</div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="sequence-container">
-                ${shuffledItems.map((item) => `
-                    <div class="sequence-item bg-gradient-to-r from-purple-500 to-pink-600 text-white p-6 rounded-xl text-lg font-bold text-center shadow-lg" data-original-index="${item.originalIndex}" onclick="selectSequenceItem(${item.originalIndex})">
-                        ${item.text}
-                    </div>
-                `).join('')}
-            </div>
-            <div class="mt-6 p-4 bg-white dark:bg-gray-700 rounded-xl shadow-lg">
-                <div class="text-lg font-bold mb-2">Votre ordre :</div>
-                <div id="selected-sequence-display" class="text-gray-600 dark:text-gray-400">Aucune sélection</div>
-            </div>
-        `;
-    } else if (game.type === 'matching') {
-        // Mélanger les éléments de gauche et de droite séparément
-        const shuffledLeft = game.pairs.map((pair, i) => ({ text: pair.left, originalIndex: i }));
-        const shuffledRight = game.pairs.map((pair, i) => ({ text: pair.right, originalIndex: i }));
-
-        // Mélanger gauche
-        for (let i = shuffledLeft.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [shuffledLeft[i], shuffledLeft[j]] = [shuffledLeft[j], shuffledLeft[i]];
-        }
-
-        // Mélanger droite
-        for (let i = shuffledRight.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [shuffledRight[i], shuffledRight[j]] = [shuffledRight[j], shuffledRight[i]];
-        }
-
-        return `
-            <div class="text-2xl font-bold text-center mb-6 text-gray-800 dark:text-white">Associez les paires (cliquez 2 éléments) :</div>
-            <div class="grid grid-cols-2 gap-6">
-                <div class="space-y-3" id="matching-left">
-                    ${shuffledLeft.map((item) => `
-                        <div class="matching-item bg-gradient-to-r from-blue-500 to-cyan-600 text-white p-4 rounded-xl text-lg font-bold text-center shadow-lg" data-side="left" data-index="${item.originalIndex}" onclick="selectMatchingItem('left', ${item.originalIndex})">
-                            ${item.text}
-                        </div>
-                    `).join('')}
-                </div>
-                <div class="space-y-3" id="matching-right">
-                    ${shuffledRight.map((item) => `
-                        <div class="matching-item bg-gradient-to-r from-purple-500 to-pink-600 text-white p-4 rounded-xl text-lg font-bold text-center shadow-lg" data-side="right" data-index="${item.originalIndex}" onclick="selectMatchingItem('right', ${item.originalIndex})">
-                            ${item.text}
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-            <div class="mt-6 p-4 bg-white dark:bg-gray-700 rounded-xl shadow-lg">
-                <div class="text-lg font-bold mb-2">Paires formées : <span id="pairs-count">0/${game.pairs.length}</span></div>
-            </div>
-        `;
-    }
-}
-
-window.selectAnswer = function(originalIndex) {
-    console.log('🔍 Clic sur réponse:', originalIndex);
-
-    // Retirer la sélection de toutes les options
-    document.querySelectorAll('.answer-option').forEach(opt => opt.classList.remove('selected'));
-
-    // Trouver et sélectionner l'option avec le bon data-original-index
-    const option = document.querySelector(`.answer-option[data-original-index="${originalIndex}"]`);
-    if (option) {
-        option.classList.add('selected');
-        selectedAnswer = originalIndex;
-        console.log('✅ Réponse sélectionnée:', originalIndex);
-    }
-}
-
-window.selectSequenceItem = function(originalIndex) {
-    console.log('🔍 Clic sur item:', originalIndex);
-
-    // Vérifier si déjà sélectionné
-    const indexPos = selectedSequence.indexOf(originalIndex);
-
-    if (indexPos !== -1) {
-        // DÉSÉLECTIONNER: retirer du tableau
-        console.log('❌ Désélection', originalIndex);
-        selectedSequence.splice(indexPos, 1);
-    } else {
-        // SÉLECTIONNER: ajouter au tableau
-        console.log('✅ Sélection', originalIndex);
-        selectedSequence.push(originalIndex);
-    }
-
-    // RAFRAÎCHIR TOUT L'AFFICHAGE
-    document.querySelectorAll('.sequence-item').forEach(el => {
-        const idx = parseInt(el.getAttribute('data-original-index'));
-        const pos = selectedSequence.indexOf(idx);
-
-        // Retirer tout
-        el.classList.remove('selected');
-        const oldNum = el.querySelector('.order-number');
-        if (oldNum) oldNum.remove();
-
-        // Réafficher si sélectionné
-        if (pos !== -1) {
-            el.classList.add('selected');
-            const orderDiv = document.createElement('div');
-            orderDiv.className = 'order-number';
-            orderDiv.textContent = pos + 1;
-            el.appendChild(orderDiv);
-        }
-    });
-
-    // Afficher le texte de l'ordre
-    database.ref('sessions/' + sessionId + '/currentGame').once('value', (snapshot) => {
-        const game = snapshot.val();
-        const selectedItems = selectedSequence.map(i => game.items[i]);
-        document.getElementById('selected-sequence-display').textContent = selectedItems.join(' → ') || 'Aucune sélection';
-        console.log('📝 Ordre:', selectedSequence);
-    });
-}
-
-window.selectMatchingItem = function(side, index) {
-    const item = document.querySelector(`.matching-item[data-side="${side}"][data-index="${index}"]`);
-
-    if (item.classList.contains('matched')) return;
-
-    if (item.classList.contains('selected')) {
-        item.classList.remove('selected');
-        selectedMatching = selectedMatching.filter(m => !(m.side === side && m.index === index));
-    } else {
-        item.classList.add('selected');
-        selectedMatching.push({ side, index });
-
-        if (selectedMatching.length === 2) {
-            if (selectedMatching[0].side !== selectedMatching[1].side) {
-                selectedMatching.forEach(m => {
-                    const el = document.querySelector(`.matching-item[data-side="${m.side}"][data-index="${m.index}"]`);
-                    el.classList.remove('selected');
-                    el.classList.add('matched');
-                });
+            if (!teamName) {
+                showCustomAlert('Veuillez entrer un nom d\'équipe');
+                return;
             }
 
+            teamId = 'team_' + generateUUID();
+
+            const teamRef = database.ref('sessions/' + sessionId + '/teams/' + teamId);
+
+            teamRef.set({
+                name: teamName,
+                score: 0,
+                hasAnswered: false,
+                joinedAt: Date.now()
+            }).then(() => {
+                console.log('✅ Équipe créée:', teamName, teamId);
+
+                teamRef.onDisconnect().remove();
+                console.log('🔌 Listener de déconnexion activé pour:', teamName);
+
+                saveTraineeSessionToURL();
+
+                enableTraineeScrollProtection();
+
+                showScreen('trainee-waiting');
+                document.getElementById('trainee-team-name-display').textContent = teamName;
+
+                database.ref('sessions/' + sessionId + '/status').on('value', (snapshot) => {
+                    const status = snapshot.val();
+                    if (status === 'playing') {
+                        listenForGameUpdatesTrainee();
+                    }
+                });
+            }).catch((error) => {
+                console.error('❌ Erreur création équipe:', error);
+                showCustomAlert('Erreur lors de la connexion. Réessayez.');
+            });
+        });
+
+        function listenForGameUpdatesTrainee() {
+            // Nettoyer l'ancien listener s'il existe
+            if (gameStatusListener) {
+                database.ref('sessions/' + sessionId + '/gameStatus').off('value', gameStatusListener);
+            }
+            if (currentGameListener) {
+                database.ref('sessions/' + sessionId + '/currentGame').off('value', currentGameListener);
+            }
+
+            // ✅ CORRECTION: Utiliser .on() au lieu de .once()
+            gameStatusListener = (snapshot) => {
+                const gameStatus = snapshot.val();
+                console.log('📡 gameStatus reçu:', gameStatus);
+
+                if (gameStatus === 'question') {
+                    currentGameListener = (snap) => {
+                        const game = snap.val();
+                        if (game) {
+                            console.log('📱 STAGIAIRE REÇOIT LA QUESTION:', game);
+                            showTraineeGame(game);
+                        }
+                    };
+                    database.ref('sessions/' + sessionId + '/currentGame').on('value', currentGameListener);
+                } else if (gameStatus === 'correction') {
+                    showTraineeResult();
+                } else if (gameStatus === 'pause' || gameStatus === 'boxes') {
+                    showScreen('ranking-screen');
+                    displayRanking('ranking-list');
+                } else if (gameStatus === 'finished') {
+                    showPodium();
+                }
+            };
+
+            database.ref('sessions/' + sessionId + '/gameStatus').on('value', gameStatusListener);
+        }
+
+        function showTraineeGame(game) {
+            showScreen('trainee-game');
+
+            document.getElementById('trainee-team-display').textContent = teamName;
+
+            database.ref('sessions/' + sessionId + '/teams/' + teamId + '/score').on('value', (snapshot) => {
+                const score = snapshot.val() || 0;
+                document.getElementById('trainee-score-display').textContent = score + ' pts';
+            });
+
+            const container = document.getElementById('trainee-game-container');
+            // ✅ Pas de remélange - afficher directement les réponses du serveur
+            container.innerHTML = renderGameForTraineeNOSHUFFLE(game);
+
+            selectedAnswer = null;
+            selectedSequence = [];
             selectedMatching = [];
 
-            const matched = document.querySelectorAll('.matching-item.matched').length / 2;
+            const btn = document.getElementById('trainee-validate-btn');
+            btn.disabled = false;
+            btn.textContent = '✓ Valider ma réponse';
+            btn.classList.remove('opacity-50', 'cursor-not-allowed');
+            btn.onclick = () => validateTraineeAnswer(game);
+        }
+
+        // ✅ NOUVELLE FONCTION: Rendu SANS REMÉLANGER
+        function renderGameForTraineeNOSHUFFLE(game) {
+            if (game.type === 'quiz' || game.type === 'true-false') {
+                return `
+                    <div class="text-2xl font-bold text-center mb-6 text-gray-800 dark:text-white">Choisissez votre réponse :</div>
+                    <div class="grid grid-cols-1 gap-4">
+                        ${game.optionsWithIndex.map((item, displayIndex) => `
+                            <div class="answer-option bg-white dark:bg-gray-700 p-6 rounded-xl text-xl font-bold text-center shadow-lg" 
+                                 data-original-index="${item.originalIndex}" 
+                                 onclick="selectAnswer(${item.originalIndex})">
+                                ${String.fromCharCode(65 + displayIndex)}. ${item.text}
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+            
+            else if (game.type === 'sequence') {
+                return `
+                    <div class="text-2xl font-bold text-center mb-6 text-gray-800 dark:text-white">Cliquez dans l'ordre :</div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="sequence-container">
+                        ${game.itemsWithIndex.map((item) => `
+                            <div class="sequence-item bg-gradient-to-r from-purple-500 to-pink-600 text-white p-6 rounded-xl text-lg font-bold text-center shadow-lg" 
+                                 data-original-index="${item.originalIndex}" 
+                                 onclick="selectSequenceItem(${item.originalIndex})">
+                                ${item.text}
+                            </div>
+                        `).join('')}
+                    </div>
+                    <div class="mt-6 p-4 bg-white dark:bg-gray-700 rounded-xl shadow-lg">
+                        <div class="text-lg font-bold mb-2">Votre ordre :</div>
+                        <div id="selected-sequence-display" class="text-gray-600 dark:text-gray-400">Aucune sélection</div>
+                    </div>
+                `;
+            }
+            
+            else if (game.type === 'matching') {
+                return `
+                    <div class="text-2xl font-bold text-center mb-6 text-gray-800 dark:text-white">Associez les paires :</div>
+                    <div class="grid grid-cols-2 gap-6">
+                        <div class="space-y-3" id="matching-left">
+                            ${game.pairsLeft.map((item) => `
+                                <div class="matching-item bg-gradient-to-r from-blue-500 to-cyan-600 text-white p-4 rounded-xl text-lg font-bold text-center shadow-lg" 
+                                     data-side="left" 
+                                     data-index="${item.originalIndex}" 
+                                     onclick="selectMatchingItem('left', ${item.originalIndex})">
+                                    ${item.text}
+                                </div>
+                            `).join('')}
+                        </div>
+                        <div class="space-y-3" id="matching-right">
+                            ${game.pairsRight.map((item) => `
+                                <div class="matching-item bg-gradient-to-r from-purple-500 to-pink-600 text-white p-4 rounded-xl text-lg font-bold text-center shadow-lg" 
+                                     data-side="right" 
+                                     data-index="${item.originalIndex}" 
+                                     onclick="selectMatchingItem('right', ${item.originalIndex})">
+                                    ${item.text}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    <div class="mt-6 p-4 bg-white dark:bg-gray-700 rounded-xl shadow-lg">
+                        <div class="text-lg font-bold mb-2">Paires formées : <span id="pairs-count">0/${game.pairsLeft.length}</span></div>
+                    </div>
+                `;
+            }
+        }
+
+        window.selectAnswer = function(originalIndex) {
+            console.log('🔍 Clic sur réponse:', originalIndex);
+
+            document.querySelectorAll('.answer-option').forEach(opt => opt.classList.remove('selected'));
+
+            const option = document.querySelector(`.answer-option[data-original-index="${originalIndex}"]`);
+            if (option) {
+                option.classList.add('selected');
+                selectedAnswer = originalIndex;
+                console.log('✅ Réponse sélectionnée:', originalIndex);
+            }
+        }
+
+        window.selectSequenceItem = function(originalIndex) {
+            console.log('🔍 Clic sur item:', originalIndex);
+
+            const indexPos = selectedSequence.indexOf(originalIndex);
+
+            if (indexPos !== -1) {
+                console.log('❌ Désélection', originalIndex);
+                selectedSequence.splice(indexPos, 1);
+            } else {
+                console.log('✅ Sélection', originalIndex);
+                selectedSequence.push(originalIndex);
+            }
+
+            document.querySelectorAll('.sequence-item').forEach(el => {
+                const idx = parseInt(el.getAttribute('data-original-index'));
+                const pos = selectedSequence.indexOf(idx);
+
+                el.classList.remove('selected');
+                const oldNum = el.querySelector('.order-number');
+                if (oldNum) oldNum.remove();
+
+                if (pos !== -1) {
+                    el.classList.add('selected');
+                    const orderDiv = document.createElement('div');
+                    orderDiv.className = 'order-number';
+                    orderDiv.textContent = pos + 1;
+                    el.appendChild(orderDiv);
+                }
+            });
+
             database.ref('sessions/' + sessionId + '/currentGame').once('value', (snapshot) => {
                 const game = snapshot.val();
-                document.getElementById('pairs-count').textContent = `${matched}/${game.pairs.length}`;
+                const selectedItems = selectedSequence.map(i => game.itemsWithIndex[game.itemsWithIndex.findIndex(x => x.originalIndex === i)].text);
+                document.getElementById('selected-sequence-display').textContent = selectedItems.join(' → ') || 'Aucune sélection';
+                console.log('📝 Ordre:', selectedSequence);
             });
         }
-    }
-}
 
-function validateTraineeAnswer(game) {
-    // Désactiver le bouton pour éviter les double-clics
-    const btn = document.getElementById('trainee-validate-btn');
-    if (btn.disabled) return; // Déjà validé
-    btn.disabled = true;
-    btn.textContent = '⏳ Envoi en cours...';
-    btn.classList.add('opacity-50', 'cursor-not-allowed');
+        window.selectMatchingItem = function(side, index) {
+            const item = document.querySelector(`.matching-item[data-side="${side}"][data-index="${index}"]`);
 
-    let answer = null;
-    let isCorrect = false;
+            if (item.classList.contains('matched')) return;
 
-    if (game.type === 'quiz' || game.type === 'true-false') {
-        answer = selectedAnswer;
-        isCorrect = (selectedAnswer === game.correctAnswer);
-    } else if (game.type === 'sequence') {
-        answer = selectedSequence;
-        isCorrect = JSON.stringify(selectedSequence) === JSON.stringify(game.correctOrder);
-    } else if (game.type === 'matching') {
-        const matchedPairs = [];
-        document.querySelectorAll('.matching-item.matched').forEach(el => {
-            const side = el.getAttribute('data-side');
-            const index = parseInt(el.getAttribute('data-index'));
-            if (!matchedPairs.find(p => p.side === side && p.index === index)) {
-                matchedPairs.push({ side, index });
+            if (item.classList.contains('selected')) {
+                item.classList.remove('selected');
+                selectedMatching = selectedMatching.filter(m => !(m.side === side && m.index === index));
+            } else {
+                item.classList.add('selected');
+                selectedMatching.push({ side, index });
+
+                if (selectedMatching.length === 2) {
+                    if (selectedMatching[0].side !== selectedMatching[1].side) {
+                        selectedMatching.forEach(m => {
+                            const el = document.querySelector(`.matching-item[data-side="${m.side}"][data-index="${m.index}"]`);
+                            el.classList.remove('selected');
+                            el.classList.add('matched');
+                        });
+                    }
+
+                    selectedMatching = [];
+
+                    const matched = document.querySelectorAll('.matching-item.matched').length / 2;
+                    database.ref('sessions/' + sessionId + '/currentGame').once('value', (snapshot) => {
+                        const game = snapshot.val();
+                        document.getElementById('pairs-count').textContent = `${matched}/${game.pairsLeft.length}`;
+                    });
+                }
             }
-        });
-        answer = matchedPairs;
-        isCorrect = (matchedPairs.length === game.pairs.length * 2);
-    }
-
-    // Sauvegarder la réponse directement (le bouton est déjà désactivé, pas de risque de doublon)
-    console.log('📤 Envoi de la réponse:', { answer, isCorrect });
-
-    database.ref('sessions/' + sessionId + '/teams/' + teamId).update({
-        hasAnswered: true,
-        answer: answer,
-        isCorrect: isCorrect
-    }).then(() => {
-        console.log('✅ Réponse sauvegardée');
-        // Incrémenter le compteur de réponses UNE SEULE FOIS
-        const countRef = database.ref('sessions/' + sessionId + '/answersCount');
-        return countRef.transaction((currentCount) => {
-            return (currentCount || 0) + 1;
-        });
-    }).then(() => {
-        console.log('✅ Compteur incrémenté!');
-        showScreen('trainee-waiting-others');
-    }).catch((error) => {
-        console.error('❌ Erreur envoi réponse:', error);
-        // Réactiver le bouton en cas d'erreur
-        btn.disabled = false;
-        btn.textContent = '✓ Valider ma réponse';
-        btn.classList.remove('opacity-50', 'cursor-not-allowed');
-        showCustomAlert('Erreur lors de l\'envoi. Réessayez.');
-    });
-}
-
-function showTraineeResult() {
-    showScreen('trainee-result');
-
-    database.ref('sessions/' + sessionId + '/teams/' + teamId).once('value', (snapshot) => {
-        const team = snapshot.val();
-
-        if (!team) {
-            console.error('❌ Équipe non trouvée:', teamId);
-            return;
         }
 
-        const points = team.lastPoints || 0;
-        const hasAnswered = team.hasAnswered || false;
-        const answer = team.answer;
+        function validateTraineeAnswer(game) {
+            const btn = document.getElementById('trainee-validate-btn');
+            if (btn.disabled) return;
+            btn.disabled = true;
+            btn.textContent = '⏳ Envoi en cours...';
+            btn.classList.add('opacity-50', 'cursor-not-allowed');
 
-        console.log('📊 Résultat stagiaire:', { points, hasAnswered, answer, isCorrect: team.isCorrect });
+            let answer = null;
+            let isCorrect = false;
 
-        // Vérifier si le stagiaire a vraiment répondu
-        if (!hasAnswered || answer === null || answer === undefined) {
-            // N'a pas répondu - afficher "Temps écoulé"
-            document.getElementById('trainee-result-icon').textContent = '⏰';
-            document.getElementById('trainee-result-title').textContent = 'Temps écoulé !';
-            document.getElementById('trainee-result-title').className = 'text-5xl md:text-6xl font-bold mb-6 text-orange-600';
-            document.getElementById('trainee-points-earned').textContent = '0';
-        } else if (points > 0) {
-            // Bonne réponse
-            document.getElementById('trainee-result-icon').textContent = '✓';
-            document.getElementById('trainee-result-title').textContent = 'Bonne réponse !';
-            document.getElementById('trainee-result-title').className = 'text-5xl md:text-6xl font-bold mb-6 text-green-600';
-            document.getElementById('trainee-points-earned').textContent = '+' + points;
-        } else {
-            // Mauvaise réponse
-            document.getElementById('trainee-result-icon').textContent = '✗';
-            document.getElementById('trainee-result-title').textContent = 'Mauvaise réponse';
-            document.getElementById('trainee-result-title').className = 'text-5xl md:text-6xl font-bold mb-6 text-red-600';
-            document.getElementById('trainee-points-earned').textContent = '0';
-        }
-
-        document.getElementById('trainee-total-score').textContent = (team.score || 0) + ' pts';
-    });
-
-    // Ne pas passer automatiquement au classement
-    // Le listener gameStatus s'occupera de passer à la prochaine question ou au classement
-}
-
-document.getElementById('reset-game-btn').addEventListener('click', () => {
-    showConfirmDialog('Voulez-vous vraiment réinitialiser la session ?', () => {
-        database.ref('sessions/' + sessionId).remove();
-        location.reload();
-    });
-});
-
-document.getElementById('restart-game-btn').addEventListener('click', () => {
-    database.ref('sessions/' + sessionId).remove();
-    location.reload();
-});
-
-    </script>
-</body>
-</html>
+            if (game.type === 'quiz' || game.type === 'true-false') {
+                answer = selectedAnswer;
+                isCorrect = (selectedAnswer === game.correctAnswer);
+            } else if (game.type === 'sequence') {
+                answer = selectedSequence;
+                isCorrect = JSON.stringify(selectedSequence) === JSON.stringify(game.correctOrder);
+            } else if (game.type === 'matching') {
+                const match
