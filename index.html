@@ -1640,4 +1640,92 @@
                 answer = selectedSequence;
                 isCorrect = JSON.stringify(selectedSequence) === JSON.stringify(game.correctOrder);
             } else if (game.type === 'matching') {
-                const match
+                const matchedPairs = [];
+                document.querySelectorAll('.matching-item.matched').forEach(el => {
+                    const side = el.getAttribute('data-side');
+                    const index = parseInt(el.getAttribute('data-index'));
+                    if (!matchedPairs.find(p => p.side === side && p.index === index)) {
+                        matchedPairs.push({ side, index });
+                    }
+                });
+                answer = matchedPairs;
+                isCorrect = (matchedPairs.length === game.pairsLeft.length);
+            }
+
+            console.log('📤 Envoi de la réponse:', { answer, isCorrect });
+
+            database.ref('sessions/' + sessionId + '/teams/' + teamId).update({
+                hasAnswered: true,
+                answer: answer,
+                isCorrect: isCorrect
+            }).then(() => {
+                console.log('✅ Réponse sauvegardée');
+                const countRef = database.ref('sessions/' + sessionId + '/answersCount');
+                return countRef.transaction((currentCount) => {
+                    return (currentCount || 0) + 1;
+                });
+            }).then(() => {
+                console.log('✅ Compteur incrémenté!');
+                showScreen('trainee-waiting-others');
+            }).catch((error) => {
+                console.error('❌ Erreur envoi réponse:', error);
+                btn.disabled = false;
+                btn.textContent = '✓ Valider ma réponse';
+                btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                showCustomAlert('Erreur lors de l\'envoi. Réessayez.');
+            });
+        }
+
+        function showTraineeResult() {
+            showScreen('trainee-result');
+
+            database.ref('sessions/' + sessionId + '/teams/' + teamId).once('value', (snapshot) => {
+                const team = snapshot.val();
+
+                if (!team) {
+                    console.error('❌ Équipe non trouvée:', teamId);
+                    return;
+                }
+
+                const points = team.lastPoints || 0;
+                const hasAnswered = team.hasAnswered || false;
+                const answer = team.answer;
+
+                console.log('📊 Résultat stagiaire:', { points, hasAnswered, answer, isCorrect: team.isCorrect });
+
+                if (!hasAnswered || answer === null || answer === undefined) {
+                    document.getElementById('trainee-result-icon').textContent = '⏰';
+                    document.getElementById('trainee-result-title').textContent = 'Temps écoulé !';
+                    document.getElementById('trainee-result-title').className = 'text-5xl md:text-6xl font-bold mb-6 text-orange-600';
+                    document.getElementById('trainee-points-earned').textContent = '0';
+                } else if (points > 0) {
+                    document.getElementById('trainee-result-icon').textContent = '✓';
+                    document.getElementById('trainee-result-title').textContent = 'Bonne réponse !';
+                    document.getElementById('trainee-result-title').className = 'text-5xl md:text-6xl font-bold mb-6 text-green-600';
+                    document.getElementById('trainee-points-earned').textContent = '+' + points;
+                } else {
+                    document.getElementById('trainee-result-icon').textContent = '✗';
+                    document.getElementById('trainee-result-title').textContent = 'Mauvaise réponse';
+                    document.getElementById('trainee-result-title').className = 'text-5xl md:text-6xl font-bold mb-6 text-red-600';
+                    document.getElementById('trainee-points-earned').textContent = '0';
+                }
+
+                document.getElementById('trainee-total-score').textContent = (team.score || 0) + ' pts';
+            });
+        }
+
+        document.getElementById('reset-game-btn').addEventListener('click', () => {
+            showConfirmDialog('Voulez-vous vraiment réinitialiser la session ?', () => {
+                database.ref('sessions/' + sessionId).remove();
+                location.reload();
+            });
+        });
+
+        document.getElementById('restart-game-btn').addEventListener('click', () => {
+            database.ref('sessions/' + sessionId).remove();
+            location.reload();
+        });
+
+    </script>
+</body>
+    </html>
