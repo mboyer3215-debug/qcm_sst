@@ -520,19 +520,19 @@
             console.log('🗑️ Session effacée de l\'URL');
         }
 
-        // ✅ Activation protection scroll
+        // Activation protection scroll
         function enableTraineeScrollProtection() {
             document.body.classList.add('trainee-connected');
             console.log('🔒 Protection scroll activée');
         }
 
-        // ✅ Désactivation protection scroll
+        // Désactivation protection scroll
         function disableTraineeScrollProtection() {
             document.body.classList.remove('trainee-connected');
             console.log('🔓 Protection scroll désactivée');
         }
 
-        // ✅ NOUVELLE FONCTION: Nettoyer TOUS les listeners Firebase actifs
+        // Nettoyer TOUS les listeners Firebase actifs
         function cleanupAllFirebaseListeners() {
             console.log('🧹 Nettoyage complet de tous les listeners Firebase...');
             
@@ -573,7 +573,7 @@
             console.log('✅ Tous les listeners nettoyés');
         }
 
-        // ✅ NOUVELLE FONCTION: Afficher un écran ET nettoyer les anciens listeners
+        // Afficher un écran ET nettoyer les anciens listeners
         function showScreenSafe(screenId) {
             console.log('📺 Affichage de l\'écran:', screenId);
             
@@ -649,15 +649,12 @@
                             return (currentCount || 0) + nonRespondantsCount;
                         });
                     }).then(() => {
-                        checkIfAllAnswered();
+                        console.log('✅ Tous les non-répondants marqués');
+                        setTimeout(() => showCorrection(), 500);
                     });
                 } else {
-                    console.log('✅ Tout le monde avait répondu');
-                    if (answersListener) {
-                        database.ref('sessions/' + sessionId + '/answersCount').off('value', answersListener);
-                        answersListener = null;
-                    }
-                    setTimeout(() => showCorrection(), 1000);
+                    console.log('✅ Tout le monde avait déjà répondu');
+                    setTimeout(() => showCorrection(), 500);
                 }
             });
         }
@@ -1156,11 +1153,20 @@
                     document.getElementById('answered-count').textContent = count;
                     document.getElementById('total-teams-count').textContent = totalTeams;
 
-                    if (count === totalTeams && count > 0) {
-                        console.log('✅ Tous ont répondu!');
-                        database.ref('sessions/' + sessionId + '/answersCount').off('value', answersListener);
-                        answersListener = null;
-                        setTimeout(() => showCorrection(), 1000);
+                    if (count >= totalTeams && count > 0) {
+                        console.log('✅ Tous ont répondu! Arrêt du timer et passage correction');
+                        
+                        if (timerInterval) {
+                            clearInterval(timerInterval);
+                            timerInterval = null;
+                        }
+                        
+                        if (answersListener) {
+                            database.ref('sessions/' + sessionId + '/answersCount').off('value', answersListener);
+                            answersListener = null;
+                        }
+                        
+                        setTimeout(() => showCorrection(), 500);
                     }
                 };
 
@@ -1173,17 +1179,19 @@
                 const games = snapshot.val();
                 const game = games[currentGameIndex];
 
-                calculateAndUpdateScores(game);
+                database.ref('sessions/' + sessionId + '/gameStatus').set('correction').then(() => {
+                    console.log('✅ GameStatus mis à jour en "correction"');
+                    
+                    calculateAndUpdateScores(game);
 
-                setTimeout(() => {
-                    showScreenSafe('projector-correction');
-                    document.getElementById('projector-explanation').textContent = game.explanation || 'Bonne réponse !';
+                    setTimeout(() => {
+                        showScreenSafe('projector-correction');
+                        document.getElementById('projector-explanation').textContent = game.explanation || 'Bonne réponse !';
 
-                    const container = document.getElementById('projector-correction-content');
-                    container.innerHTML = renderCorrection(game);
-
-                    database.ref('sessions/' + sessionId + '/gameStatus').set('correction');
-                }, 500);
+                        const container = document.getElementById('projector-correction-content');
+                        container.innerHTML = renderCorrection(game);
+                    }, 500);
+                });
             });
         }
 
@@ -1451,6 +1459,12 @@
                 console.log('📡 gameStatus reçu:', gameStatus);
 
                 if (gameStatus === 'question') {
+                    console.log('❓ Question reçue');
+                    
+                    if (currentGameListener) {
+                        database.ref('sessions/' + sessionId + '/currentGame').off('value', currentGameListener);
+                    }
+
                     currentGameListener = (snap) => {
                         const game = snap.val();
                         if (game) {
@@ -1459,12 +1473,30 @@
                         }
                     };
                     database.ref('sessions/' + sessionId + '/currentGame').on('value', currentGameListener);
-                } else if (gameStatus === 'correction') {
+                } 
+                else if (gameStatus === 'correction') {
+                    console.log('✅ Correction reçue');
+                    if (currentGameListener) {
+                        database.ref('sessions/' + sessionId + '/currentGame').off('value', currentGameListener);
+                        currentGameListener = null;
+                    }
                     showTraineeResult();
-                } else if (gameStatus === 'pause' || gameStatus === 'boxes') {
+                } 
+                else if (gameStatus === 'pause' || gameStatus === 'boxes') {
+                    console.log('🏆 Classement/Pause reçu');
+                    if (currentGameListener) {
+                        database.ref('sessions/' + sessionId + '/currentGame').off('value', currentGameListener);
+                        currentGameListener = null;
+                    }
                     showScreenSafe('ranking-screen');
                     displayRanking('ranking-list');
-                } else if (gameStatus === 'finished') {
+                } 
+                else if (gameStatus === 'finished') {
+                    console.log('🏆 Podium reçu');
+                    if (currentGameListener) {
+                        database.ref('sessions/' + sessionId + '/currentGame').off('value', currentGameListener);
+                        currentGameListener = null;
+                    }
                     showScreenSafe('podium-screen');
                     showPodium();
                 }
