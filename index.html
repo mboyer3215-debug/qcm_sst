@@ -532,9 +532,9 @@
             console.log('🔓 Protection scroll désactivée');
         }
 
-        // Nettoyer TOUS les listeners Firebase actifs
+        // Nettoyer TOUS les listeners Firebase actifs (SAUF gameStatus)
         function cleanupAllFirebaseListeners() {
-            console.log('🧹 Nettoyage complet de tous les listeners Firebase...');
+            console.log('🧹 Nettoyage des listeners (SAUF gameStatus)');
             
             // Arrêter le timer
             if (timerInterval) {
@@ -542,15 +542,11 @@
                 timerInterval = null;
             }
             
-            // Arrêter les listeners de gameStatus
-            if (gameStatusListener) {
-                database.ref('sessions/' + sessionId + '/gameStatus').off('value', gameStatusListener);
-                gameStatusListener = null;
-            }
+            // ✅ NE PAS arrêter gameStatusListener - il doit rester actif!
             
             // Arrêter les listeners de currentGame
             if (currentGameListener) {
-                database.ref('sessions/' + sessionId + '/currentGame').off('value', currentGameListener);
+                database.ref('sessions/' + sessionId + '/currentGame').off('value');
                 currentGameListener = null;
             }
             
@@ -570,15 +566,30 @@
             });
             allActiveListeners = [];
             
-            console.log('✅ Tous les listeners nettoyés');
+            console.log('✅ Nettoyage terminé (gameStatus reste actif)');
         }
 
-        // Afficher un écran ET nettoyer les anciens listeners
+        // Afficher un écran ET nettoyer les anciens listeners (SAUF gameStatus)
         function showScreenSafe(screenId) {
-            console.log('📺 Affichage de l\'écran:', screenId);
+            console.log('📺 Affichage écran:', screenId);
             
-            // Nettoyer les listeners AVANT de changer d'écran
-            cleanupAllFirebaseListeners();
+            // ✅ NE PAS appeler cleanupAllFirebaseListeners() car on veut garder gameStatus!
+            
+            // Arrêter seulement le timer et currentGame
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+            
+            if (currentGameListener) {
+                database.ref('sessions/' + sessionId + '/currentGame').off('value');
+                currentGameListener = null;
+            }
+            
+            if (answersListener) {
+                database.ref('sessions/' + sessionId + '/answersCount').off('value', answersListener);
+                answersListener = null;
+            }
             
             // Cacher tous les écrans
             document.querySelectorAll('#app > div').forEach(screen => {
@@ -588,7 +599,7 @@
             // Afficher le nouvel écran
             document.getElementById(screenId).classList.remove('hidden');
             
-            // Scroll vers le haut de l'écran
+            // Scroll vers le haut
             document.getElementById('app').scrollTop = 0;
         }
 
@@ -1149,7 +1160,7 @@
 
                 answersListener = (snapshot) => {
                     const count = snapshot.val() || 0;
-                    console.log('📊 Réponses reçues:', count, '/', totalTeams, 'à', new Date().toLocaleTimeString());
+                    console.log('📊 Réponses reçues:', count, '/', totalTeams);
 
                     document.getElementById('answered-count').textContent = count;
                     document.getElementById('total-teams-count').textContent = totalTeams;
@@ -1172,7 +1183,6 @@
                 };
 
                 database.ref('sessions/' + sessionId + '/answersCount').on('value', answersListener);
-                console.log('✅ Listener answersCount ACTIVÉ');
             });
         }
 
@@ -1457,71 +1467,75 @@
         });
 
         function listenForGameUpdatesTrainee() {
-            cleanupAllFirebaseListeners();
-
+            console.log('🎯 ACTIVATION du listener PERMANENT gameStatus');
+            
+            // ✅ NE PAS nettoyer le listener gameStatus!
             if (gameStatusListener) {
                 database.ref('sessions/' + sessionId + '/gameStatus').off('value', gameStatusListener);
             }
-            if (currentGameListener) {
-                database.ref('sessions/' + sessionId + '/currentGame').off('value', currentGameListener);
-            }
-
-            console.log('🎯 Démarrage de listenForGameUpdatesTrainee');
 
             gameStatusListener = (snapshot) => {
                 const gameStatus = snapshot.val();
-                console.log('📡 gameStatus REÇU:', gameStatus, 'Timestamp:', new Date().toLocaleTimeString());
+                console.log('📡 gameStatus REÇU à', new Date().toLocaleTimeString(), ':', gameStatus);
 
                 if (gameStatus === 'question') {
-                    console.log('❓ Question reçue - Attente du currentGame');
+                    console.log('❓ Réception statut QUESTION');
                     
+                    // Nettoyer SEULEMENT le currentGame listener
                     if (currentGameListener) {
-                        database.ref('sessions/' + sessionId + '/currentGame').off('value', currentGameListener);
+                        database.ref('sessions/' + sessionId + '/currentGame').off('value');
+                        currentGameListener = null;
                     }
 
-                    currentGameListener = (snap) => {
-                        const game = snap.val();
-                        if (game) {
-                            console.log('📱 STAGIAIRE REÇOIT LA QUESTION:', game.question);
-                            showTraineeGame(game);
-                        }
-                    };
-                    database.ref('sessions/' + sessionId + '/currentGame').on('value', currentGameListener);
+                    // Attendre un peu que Firebase envoie le jeu
+                    setTimeout(() => {
+                        database.ref('sessions/' + sessionId + '/currentGame').on('value', (snap) => {
+                            const game = snap.val();
+                            console.log('📱 currentGame REÇU:', game ? game.question : 'null');
+                            if (game) {
+                                currentGameListener = snap.key;
+                                showTraineeGame(game);
+                            }
+                        });
+                    }, 200);
                 } 
                 else if (gameStatus === 'correction') {
-                    console.log('✅ CORRECTION REÇUE - Affichage du résultat');
+                    console.log('✅ Réception statut CORRECTION');
                     
                     if (currentGameListener) {
-                        database.ref('sessions/' + sessionId + '/currentGame').off('value', currentGameListener);
+                        database.ref('sessions/' + sessionId + '/currentGame').off('value');
                         currentGameListener = null;
                     }
                     
-                    setTimeout(() => {
-                        showTraineeResult();
-                    }, 300);
+                    showTraineeResult();
                 } 
                 else if (gameStatus === 'pause' || gameStatus === 'boxes') {
-                    console.log('🏆 CLASSEMENT/PAUSE REÇU');
+                    console.log('🏆 Réception statut PAUSE/BOXES');
+                    
                     if (currentGameListener) {
-                        database.ref('sessions/' + sessionId + '/currentGame').off('value', currentGameListener);
+                        database.ref('sessions/' + sessionId + '/currentGame').off('value');
                         currentGameListener = null;
                     }
+                    
                     showScreenSafe('ranking-screen');
                     displayRanking('ranking-list');
                 } 
                 else if (gameStatus === 'finished') {
-                    console.log('🏆 PODIUM REÇU');
+                    console.log('🏆 Réception statut FINISHED');
+                    
                     if (currentGameListener) {
-                        database.ref('sessions/' + sessionId + '/currentGame').off('value', currentGameListener);
+                        database.ref('sessions/' + sessionId + '/currentGame').off('value');
                         currentGameListener = null;
                     }
+                    
                     showScreenSafe('podium-screen');
                     showPodium();
                 }
             };
 
+            // ✅ ÉCOUTER EN PERMANENCE SANS JAMAIS ARRÊTER
             database.ref('sessions/' + sessionId + '/gameStatus').on('value', gameStatusListener);
-            console.log('✅ Listener gameStatus ACTIVÉ');
+            console.log('✅ Listener PERMANENT activé sur gameStatus');
         }
 
         function showTraineeGame(game) {
@@ -1803,4 +1817,4 @@
 
     </script>
 </body>
-</html>
+                </html>
