@@ -485,16 +485,20 @@
             teamRef.onDisconnect().remove();
             console.log('🔌 Listener de déconnexion réactivé pour:', teamName);
 
-            database.ref('sessions/' + sessionId + '/status').once('value', (snapshot) => {
-                const status = snapshot.val();
-
-                if (!status) {
-                    showCustomAlert('Cette session n\'existe plus. Veuillez rejoindre une nouvelle session.');
+            // ✅ RÉCUPÉRER L'ÉTAT ACTUEL DE LA SESSION
+            database.ref('sessions/' + sessionId).once('value', (snapshot) => {
+                const sessionData = snapshot.val();
+                
+                if (!sessionData) {
+                    showCustomAlert('Cette session n\'existe plus.');
                     clearSessionFromURL();
                     disableTraineeScrollProtection();
                     showScreenSafe('trainee-login');
                     return;
                 }
+
+                const status = sessionData.status;
+                console.log('📊 État de la session:', { status, currentBox: sessionData.currentBox, currentGameIndex: sessionData.currentGameIndex });
 
                 if (status === 'waiting') {
                     showScreenSafe('trainee-waiting');
@@ -506,7 +510,22 @@
                             listenForGameUpdatesTrainee();
                         }
                     });
-                } else if (status === 'playing') {
+                } 
+                else if (status === 'playing') {
+                    // ✅ RÉCUPÉRER LA QUESTION ACTUELLE
+                    console.log('▶️ Session en cours - Récupération de la question actuelle');
+                    database.ref('sessions/' + sessionId + '/currentGame').once('value', (gameSnapshot) => {
+                        const game = gameSnapshot.val();
+                        if (game) {
+                            console.log('📱 Question restaurée:', game.question);
+                            showTraineeGame(game);
+                        } else {
+                            console.log('⏳ Pas de question active');
+                            showScreenSafe('trainee-waiting');
+                        }
+                    });
+                    
+                    // Écouter les changements de statut
                     listenForGameUpdatesTrainee();
                 }
             });
@@ -542,8 +561,6 @@
                 timerInterval = null;
             }
             
-            // ✅ NE PAS arrêter gameStatusListener - il doit rester actif!
-            
             // Arrêter les listeners de currentGame
             if (currentGameListener) {
                 database.ref('sessions/' + sessionId + '/currentGame').off('value');
@@ -572,8 +589,6 @@
         // Afficher un écran ET nettoyer les anciens listeners (SAUF gameStatus)
         function showScreenSafe(screenId) {
             console.log('📺 Affichage écran:', screenId);
-            
-            // ✅ NE PAS appeler cleanupAllFirebaseListeners() car on veut garder gameStatus!
             
             // Arrêter seulement le timer et currentGame
             if (timerInterval) {
@@ -871,6 +886,7 @@
                 
                 shuffledGame.optionsWithIndex = optionsWithIndex;
                 shuffledGame.options = optionsWithIndex.map(o => o.text);
+                shuffledGame.correctAnswer = game.correctAnswer; // ✅ Garder correctAnswer inchangé
             }
             
             else if (game.type === 'sequence') {
@@ -887,6 +903,7 @@
                 
                 shuffledGame.itemsWithIndex = itemsWithIndex;
                 shuffledGame.items = itemsWithIndex.map(i => i.text);
+                shuffledGame.correctOrder = game.correctOrder; // ✅ Garder correctOrder inchangé
             }
             
             else if (game.type === 'matching') {
@@ -914,6 +931,7 @@
                 
                 shuffledGame.pairsLeft = pairsLeft;
                 shuffledGame.pairsRight = pairsRight;
+                shuffledGame.pairs = game.pairs; // ✅ Garder pairs original pour vérification
             }
 
             return shuffledGame;
@@ -1043,8 +1061,9 @@
             loadGame();
         }
 
+        // ✅ FONCTION MODIFIÉE AVEC SYNCHRONISATION
         function loadGame() {
-            console.log('🔄 Question', currentGameIndex);
+            console.log('🔄 Chargement Question', currentGameIndex);
 
             database.ref('sessions/' + sessionId + '/randomizedGames').once('value', (snapshot) => {
                 const games = snapshot.val();
@@ -1056,19 +1075,27 @@
                 resetAnswersFlags().then(() => {
                     console.log('✅ Flags hasAnswered réinitialisés');
 
-                    return database.ref('sessions/' + sessionId).update({
-                        answersCount: 0,
-                        currentGame: preparedGame,
-                        currentGameIndex: currentGameIndex,
-                        gameStatus: 'question',
-                        questionTimestamp: Date.now()
-                    });
+                    // ✅ METTRE À JOUR currentGame EN PREMIER
+                    return database.ref('sessions/' + sessionId + '/currentGame').set(preparedGame);
                 }).then(() => {
-                    showProjectorQuestion(preparedGame);
+                    console.log('✅ currentGame mis à jour');
+                    
+                    // ✅ PUIS METTRE À JOUR LE RESTE (avec délai)
                     setTimeout(() => {
-                        startAnswersCountListener();
-                        console.log('✅ Question prête - Listener actif!');
-                    }, 500);
+                        return database.ref('sessions/' + sessionId).update({
+                            answersCount: 0,
+                            currentGameIndex: currentGameIndex,
+                            gameStatus: 'question',
+                            questionTimestamp: Date.now()
+                        }).then(() => {
+                            console.log('✅ gameStatus mis à jour');
+                            showProjectorQuestion(preparedGame);
+                            setTimeout(() => {
+                                startAnswersCountListener();
+                                console.log('✅ Question prête!');
+                            }, 500);
+                        });
+                    }, 300);
                 });
             });
         }
@@ -1466,10 +1493,10 @@
             });
         });
 
+        // ✅ FONCTION MODIFIÉE AVEC DÉLAI
         function listenForGameUpdatesTrainee() {
             console.log('🎯 ACTIVATION du listener PERMANENT gameStatus');
             
-            // ✅ NE PAS nettoyer le listener gameStatus!
             if (gameStatusListener) {
                 database.ref('sessions/' + sessionId + '/gameStatus').off('value', gameStatusListener);
             }
@@ -1479,25 +1506,32 @@
                 console.log('📡 gameStatus REÇU à', new Date().toLocaleTimeString(), ':', gameStatus);
 
                 if (gameStatus === 'question') {
-                    console.log('❓ Réception statut QUESTION');
+                    console.log('❓ Réception statut QUESTION - Attente du currentGame');
                     
-                    // Nettoyer SEULEMENT le currentGame listener
                     if (currentGameListener) {
                         database.ref('sessions/' + sessionId + '/currentGame').off('value');
                         currentGameListener = null;
                     }
 
-                    // Attendre un peu que Firebase envoie le jeu
+                    // ✅ ATTENDRE 800ms QUE LE JEU SOIT PRÊT
                     setTimeout(() => {
-                        database.ref('sessions/' + sessionId + '/currentGame').on('value', (snap) => {
+                        database.ref('sessions/' + sessionId + '/currentGame').once('value', (snap) => {
                             const game = snap.val();
                             console.log('📱 currentGame REÇU:', game ? game.question : 'null');
-                            if (game) {
-                                currentGameListener = snap.key;
+                            
+                            if (game && game.question) {
                                 showTraineeGame(game);
+                                
+                                // Puis écouter les mises à jour
+                                database.ref('sessions/' + sessionId + '/currentGame').on('value', (updateSnap) => {
+                                    console.log('🔄 currentGame mis à jour');
+                                    currentGameListener = updateSnap.key;
+                                });
+                            } else {
+                                console.warn('⚠️ Game non valide reçu');
                             }
                         });
-                    }, 200);
+                    }, 800); // ✅ DÉLAI DE 800ms
                 } 
                 else if (gameStatus === 'correction') {
                     console.log('✅ Réception statut CORRECTION');
@@ -1533,7 +1567,6 @@
                 }
             };
 
-            // ✅ ÉCOUTER EN PERMANENCE SANS JAMAIS ARRÊTER
             database.ref('sessions/' + sessionId + '/gameStatus').on('value', gameStatusListener);
             console.log('✅ Listener PERMANENT activé sur gameStatus');
         }
@@ -1712,6 +1745,7 @@
             }
         }
 
+        // ✅ FONCTION MODIFIÉE POUR QUESTIONS D'APPAIRAGE
         function validateTraineeAnswer(game) {
             const btn = document.getElementById('trainee-validate-btn');
             if (btn.disabled) return;
@@ -1725,23 +1759,65 @@
             if (game.type === 'quiz' || game.type === 'true-false') {
                 answer = selectedAnswer;
                 isCorrect = (selectedAnswer === game.correctAnswer);
-            } else if (game.type === 'sequence') {
+                
+                console.log('🔍 QUIZ:', {
+                    selectedAnswer: selectedAnswer,
+                    correctAnswer: game.correctAnswer,
+                    isCorrect: isCorrect,
+                    question: game.question
+                });
+            } 
+            else if (game.type === 'sequence') {
                 answer = selectedSequence;
                 isCorrect = JSON.stringify(selectedSequence) === JSON.stringify(game.correctOrder);
-            } else if (game.type === 'matching') {
+                
+                console.log('🔍 SEQUENCE:', {
+                    selectedSequence: selectedSequence,
+                    correctOrder: game.correctOrder,
+                    isCorrect: isCorrect
+                });
+            } 
+            else if (game.type === 'matching') {
+                // ✅ NOUVELLE LOGIQUE POUR MATCHING
                 const matchedPairs = [];
                 document.querySelectorAll('.matching-item.matched').forEach(el => {
                     const side = el.getAttribute('data-side');
                     const index = parseInt(el.getAttribute('data-index'));
-                    if (!matchedPairs.find(p => p.side === side && p.index === index)) {
-                        matchedPairs.push({ side, index });
-                    }
+                    matchedPairs.push({ side, index });
                 });
+                
+                // ✅ VÉRIFIER QUE TOUTES LES PAIRES SONT CORRECTES
+                isCorrect = true;
+                if (matchedPairs.length !== game.pairs.length) {
+                    isCorrect = false;
+                } else {
+                    // Vérifier que chaque paire left/right correspond
+                    for (let i = 0; i < matchedPairs.length; i++) {
+                        const pair = matchedPairs[i];
+                        
+                        // Pour chaque paire matchée, vérifier qu'elle correspond
+                        // Les deux éléments d'une paire doivent avoir le même originalIndex
+                        const leftMatched = matchedPairs.filter(p => p.side === 'left' && p.index === pair.index).length;
+                        const rightMatched = matchedPairs.filter(p => p.side === 'right' && p.index === pair.index).length;
+                        
+                        if (!leftMatched || !rightMatched) {
+                            isCorrect = false;
+                            break;
+                        }
+                    }
+                }
+                
                 answer = matchedPairs;
-                isCorrect = (matchedPairs.length === game.pairsLeft.length);
+                
+                console.log('🔍 MATCHING:', {
+                    matchedPairs: matchedPairs,
+                    totalPairs: game.pairs.length,
+                    isCorrect: isCorrect,
+                    game_pairs: game.pairs
+                });
             }
 
-            console.log('📤 Envoi de la réponse:', { answer, isCorrect });
+            console.log('📤 Envoi:', { answer, isCorrect, gameType: game.type });
 
             database.ref('sessions/' + sessionId + '/teams/' + teamId).update({
                 hasAnswered: true,
@@ -1817,4 +1893,4 @@
 
     </script>
 </body>
-                </html>
+    </html>
