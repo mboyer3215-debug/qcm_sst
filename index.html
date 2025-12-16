@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QCM SST Synchronisé - Formation Interactive</title>
+    <title>QCM SST - Formation Interactive</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -79,16 +79,6 @@
             transform: scale(1.05);
         }
 
-        .answer-option.correct {
-            border-color: #10b981;
-            background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.1) 100%);
-        }
-
-        .answer-option.incorrect {
-            border-color: #ef4444;
-            background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(239, 68, 68, 0.1) 100%);
-        }
-
         .sequence-item {
             transition: all 0.3s;
             cursor: pointer;
@@ -143,8 +133,10 @@
         }
 
         .matching-item.matched {
-            opacity: 0.5;
+            opacity: 0.6;
             cursor: not-allowed;
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.3) 0%, rgba(16, 185, 129, 0.2) 100%);
+            border-color: #10b981 !important;
         }
 
         .box-disabled {
@@ -388,6 +380,7 @@
                 <div class="bg-gradient-to-r from-primary via-purple-600 to-pink-600 text-white rounded-2xl p-10 mb-8 shadow-2xl">
                     <div class="text-7xl font-bold mb-3" id="trainee-points-earned">+150</div>
                     <div class="text-3xl font-semibold">Points gagnés</div>
+                    <div class="text-lg mt-2 opacity-90" id="points-bonus">Bonus vitesse: +50 pts</div>
                 </div>
                 <div class="bg-white dark:bg-gray-800 rounded-2xl p-6">
                     <div class="text-4xl font-bold text-primary mb-2" id="trainee-total-score">150</div>
@@ -435,7 +428,7 @@
             </div>
         </div>
 
-        <!-- ✅ ÉCRAN ADMINISTRATION -->
+        <!-- ÉCRAN ADMINISTRATION -->
         <div id="admin-panel" class="hidden max-w-7xl mx-auto">
             <div class="text-center mb-6">
                 <h1 class="text-4xl md:text-5xl font-bold text-primary neon-text mb-2">⚙️ Panneau d'Administration</h1>
@@ -462,9 +455,15 @@
                     </div>
 
                     <div>
-                        <label class="block text-lg font-bold text-gray-800 dark:text-white mb-2">Points par bonne réponse</label>
+                        <label class="block text-lg font-bold text-gray-800 dark:text-white mb-2">Points par bonne réponse (base)</label>
                         <input type="number" id="points-per-answer" min="10" max="500" value="150" class="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white">
-                        <p class="text-sm text-gray-600 dark:text-gray-400 mt-2">Points attribués pour une réponse correcte</p>
+                        <p class="text-sm text-gray-600 dark:text-gray-400 mt-2">Points de base (bonus vitesse en sus)</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-lg font-bold text-gray-800 dark:text-white mb-2">Bonus vitesse max (pts)</label>
+                        <input type="number" id="speed-bonus" min="10" max="300" value="100" class="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white">
+                        <p class="text-sm text-gray-600 dark:text-gray-400 mt-2">Bonus maximum pour la réponse la plus rapide</p>
                     </div>
 
                     <div>
@@ -536,6 +535,7 @@
         let timeRemaining = 30;
         let gameStatusListener = null;
         let currentGameListener = null;
+        let questionStartTime = null; // ✅ NOUVEAU: Enregistrer l'heure de début
 
         const SUPERVISOR_PASSWORD = "sst2025";
         const QUESTION_TIME_LIMIT = 30;
@@ -543,8 +543,11 @@
         // ✅ VARIABLES ADMIN GLOBALES
         let QUESTION_TIME = 30;
         let POINTS_PER_ANSWER = 150;
+        let SPEED_BONUS_MAX = 100; // ✅ NOUVEAU: Bonus vitesse maximum
         let SYNC_DELAY = 800;
         let QUESTIONS_PER_BOX = 7;
+
+        // ... (Rest of the code continues with all previous functions)
 
         // Sauvegarder la session en mettant à jour l'URL
         function saveTraineeSessionToURL() {
@@ -577,7 +580,6 @@
             teamRef.onDisconnect().remove();
             console.log('🔌 Listener de déconnexion réactivé pour:', teamName);
 
-            // ✅ RÉCUPÉRER L'ÉTAT ACTUEL DE LA SESSION
             database.ref('sessions/' + sessionId).once('value', (snapshot) => {
                 const sessionData = snapshot.val();
                 
@@ -590,7 +592,7 @@
                 }
 
                 const status = sessionData.status;
-                console.log('📊 État de la session:', { status, currentBox: sessionData.currentBox, currentGameIndex: sessionData.currentGameIndex });
+                console.log('📊 État de la session:', { status });
 
                 if (status === 'waiting') {
                     showScreenSafe('trainee-waiting');
@@ -604,7 +606,6 @@
                     });
                 } 
                 else if (status === 'playing') {
-                    // ✅ RÉCUPÉRER LA QUESTION ACTUELLE
                     console.log('▶️ Session en cours - Récupération de la question actuelle');
                     database.ref('sessions/' + sessionId + '/currentGame').once('value', (gameSnapshot) => {
                         const game = gameSnapshot.val();
@@ -617,7 +618,6 @@
                         }
                     });
                     
-                    // Écouter les changements de statut
                     listenForGameUpdatesTrainee();
                 }
             });
@@ -647,25 +647,21 @@
         function cleanupAllFirebaseListeners() {
             console.log('🧹 Nettoyage des listeners (SAUF gameStatus)');
             
-            // Arrêter le timer
             if (timerInterval) {
                 clearInterval(timerInterval);
                 timerInterval = null;
             }
             
-            // Arrêter les listeners de currentGame
             if (currentGameListener) {
                 database.ref('sessions/' + sessionId + '/currentGame').off('value');
                 currentGameListener = null;
             }
             
-            // Arrêter le listener de answersCount
             if (answersListener) {
                 database.ref('sessions/' + sessionId + '/answersCount').off('value', answersListener);
                 answersListener = null;
             }
             
-            // Arrêter tous les autres listeners
             allActiveListeners.forEach(listener => {
                 try {
                     listener.off();
@@ -682,7 +678,6 @@
         function showScreenSafe(screenId) {
             console.log('📺 Affichage écran:', screenId);
             
-            // Arrêter seulement le timer et currentGame
             if (timerInterval) {
                 clearInterval(timerInterval);
                 timerInterval = null;
@@ -698,21 +693,19 @@
                 answersListener = null;
             }
             
-            // Cacher tous les écrans
             document.querySelectorAll('#app > div').forEach(screen => {
                 screen.classList.add('hidden');
             });
             
-            // Afficher le nouvel écran
             document.getElementById(screenId).classList.remove('hidden');
             
-            // Scroll vers le haut
             document.getElementById('app').scrollTop = 0;
         }
 
         // Démarrer le timer
         function startQuestionTimer() {
-            timeRemaining = QUESTION_TIME; // ✅ Utiliser la variable globale
+            timeRemaining = QUESTION_TIME;
+            questionStartTime = Date.now(); // ✅ Enregistrer l'heure de début
             document.getElementById('timer-display').textContent = timeRemaining;
             document.getElementById('timer-display').style.color = 'white';
 
@@ -926,6 +919,32 @@
             });
         }
 
+        // ✅ FONCTION POUR CALCULER LES POINTS AVEC BONUS VITESSE
+        function calculatePointsWithSpeedBonus(isCorrect, elapsedTime) {
+            if (!isCorrect) {
+                return 0;
+            }
+
+            const basePoints = POINTS_PER_ANSWER;
+            let speedBonus = 0;
+
+            // Calculer le bonus de vitesse (plus rapide = plus de points)
+            // Si répondre avant 5 secondes = 100% du bonus
+            // Si répondre après QUESTION_TIME-5 secondes = 0% du bonus
+            const speedWindowStart = 0;
+            const speedWindowEnd = QUESTION_TIME - 5; // Dernières 5 secondes = pas de bonus
+
+            if (elapsedTime < speedWindowEnd) {
+                const speedRatio = 1 - (elapsedTime / speedWindowEnd);
+                speedBonus = Math.max(0, Math.round(SPEED_BONUS_MAX * speedRatio));
+            }
+
+            const totalPoints = basePoints + speedBonus;
+            console.log('📊 Calcul points - Temps: ${elapsedTime}s, Base: ${basePoints}, Bonus: ${speedBonus}, Total: ${totalPoints}');
+            
+            return { basePoints, speedBonus, totalPoints };
+        }
+
         // Randomiser les questions d'un coffre
         function getRandomizedGames(boxIndex) {
             const allGames = [...BOXES_DATA[boxIndex].games];
@@ -933,7 +952,7 @@
                 const j = Math.floor(Math.random() * (i + 1));
                 [allGames[i], allGames[j]] = [allGames[j], allGames[i]];
             }
-            return allGames.slice(0, QUESTIONS_PER_BOX); // ✅ Utiliser la variable globale
+            return allGames.slice(0, QUESTIONS_PER_BOX);
         }
 
         // Préparer le jeu avec réponses mélangées
@@ -1177,6 +1196,7 @@
                     updates['sessions/' + sessionId + '/teams/' + id + '/answer'] = null;
                     updates['sessions/' + sessionId + '/teams/' + id + '/isCorrect'] = false;
                     updates['sessions/' + sessionId + '/teams/' + id + '/lastPoints'] = 0;
+                    updates['sessions/' + sessionId + '/teams/' + id + '/answerTime'] = 0; // ✅ NOUVEAU
                 });
 
                 console.log('🔄 Réinitialisation des flags pour', Object.keys(teams).length, 'équipes');
@@ -1334,11 +1354,14 @@
             } else if (game.type === 'matching') {
                 return `
                     <div class="space-y-3">
-                        ${game.pairsLeft.map((pair, i) => `
-                            <div class="bg-green-100 dark:bg-green-900 p-4 rounded-xl text-lg font-bold text-green-800 dark:text-green-200">
-                                ✓ ${pair.text} → ${game.pairsRight.find(r => r.originalIndex === pair.originalIndex).text}
-                            </div>
-                        `).join('')}
+                        ${game.pairsLeft.map((pair, i) => {
+                            const rightPair = game.pairsRight.find(r => r.originalIndex === pair.originalIndex);
+                            return `
+                                <div class="bg-green-100 dark:bg-green-900 p-4 rounded-xl text-lg font-bold text-green-800 dark:text-green-200">
+                                    ✓ ${pair.text} → ${rightPair ? rightPair.text : '?'}
+                                </div>
+                            `;
+                        }).join('')}
                     </div>
                 `;
             }
@@ -1350,19 +1373,23 @@
                 if (!teams) return;
 
                 Object.entries(teams).forEach(([id, team]) => {
-                    let points = 0;
+                    let pointsData = { basePoints: 0, speedBonus: 0, totalPoints: 0 };
                     
-                    if (team.isCorrect === true) {
-                        points = POINTS_PER_ANSWER; // ✅ Utiliser la variable globale
+                    if (team.isCorrect === true && team.answerTime !== undefined) {
+                        // ✅ Calculer les points avec bonus vitesse
+                        pointsData = calculatePointsWithSpeedBonus(true, team.answerTime);
+                    } else if (team.isCorrect === false) {
+                        pointsData = { basePoints: 0, speedBonus: 0, totalPoints: 0 };
                     }
                     
-                    console.log('📊 Équipe:', team.name, '| isCorrect:', team.isCorrect, '| Points:', points);
+                    console.log('📊 Équipe:', team.name, '| Temps:', team.answerTime, 's | Points:', pointsData);
                     
-                    const newScore = (team.score || 0) + points;
+                    const newScore = (team.score || 0) + pointsData.totalPoints;
                     
                     database.ref('sessions/' + sessionId + '/teams/' + id).update({
                         score: newScore,
-                        lastPoints: points
+                        lastPoints: pointsData.totalPoints,
+                        lastSpeedBonus: pointsData.speedBonus
                     });
                 });
             });
@@ -1483,7 +1510,7 @@
             });
         }
 
-        // Connexion Stagiaire - avec auto-reconnexion
+        // Connexion Stagiaire
         window.addEventListener('DOMContentLoaded', () => {
             loadAdminSettings();
             
@@ -1535,6 +1562,7 @@
                 name: teamName,
                 score: 0,
                 hasAnswered: false,
+                answerTime: 0, // ✅ NOUVEAU
                 joinedAt: Date.now()
             }).then(() => {
                 console.log('✅ Équipe créée:', teamName, teamId);
@@ -1596,7 +1624,7 @@
                                 console.warn('⚠️ Game non valide reçu');
                             }
                         });
-                    }, SYNC_DELAY); // ✅ Utiliser la variable globale
+                    }, SYNC_DELAY);
                 } 
                 else if (gameStatus === 'correction') {
                     console.log('✅ Réception statut CORRECTION');
@@ -1791,11 +1819,21 @@
                 selectedMatching.push({ side, index });
 
                 if (selectedMatching.length === 2) {
-                    if (selectedMatching[0].side !== selectedMatching[1].side) {
+                    // ✅ VÉRIFIER QUE LES DEUX INDICES CORRESPONDENT
+                    if (selectedMatching[0].index === selectedMatching[1].index && 
+                        selectedMatching[0].side !== selectedMatching[1].side) {
+                        
                         selectedMatching.forEach(m => {
                             const el = document.querySelector(`.matching-item[data-side="${m.side}"][data-index="${m.index}"]`);
                             el.classList.remove('selected');
                             el.classList.add('matched');
+                        });
+                        console.log('✅ Paire correcte appariée:', selectedMatching);
+                    } else {
+                        console.log('❌ Paire incorrecte:', selectedMatching);
+                        selectedMatching.forEach(m => {
+                            const el = document.querySelector(`.matching-item[data-side="${m.side}"][data-index="${m.index}"]`);
+                            el.classList.remove('selected');
                         });
                     }
 
@@ -1810,12 +1848,16 @@
             }
         }
 
+        // ✅ FONCTION VALIDÉE AVEC BONUS VITESSE ET APPAIRAGE CORRIGÉ
         function validateTraineeAnswer(game) {
             const btn = document.getElementById('trainee-validate-btn');
             if (btn.disabled) return;
             btn.disabled = true;
             btn.textContent = '⏳ Envoi en cours...';
             btn.classList.add('opacity-50', 'cursor-not-allowed');
+
+            // ✅ Calculer le temps écoulé
+            const elapsedTime = Math.round((Date.now() - questionStartTime) / 1000);
 
             let answer = null;
             let isCorrect = false;
@@ -1828,7 +1870,7 @@
                     selectedAnswer: selectedAnswer,
                     correctAnswer: game.correctAnswer,
                     isCorrect: isCorrect,
-                    question: game.question
+                    elapsedTime: elapsedTime + 's'
                 });
             } 
             else if (game.type === 'sequence') {
@@ -1838,52 +1880,54 @@
                 console.log('🔍 SEQUENCE:', {
                     selectedSequence: selectedSequence,
                     correctOrder: game.correctOrder,
-                    isCorrect: isCorrect
+                    isCorrect: isCorrect,
+                    elapsedTime: elapsedTime + 's'
                 });
             } 
             else if (game.type === 'matching') {
-                const matchedPairs = [];
-                document.querySelectorAll('.matching-item.matched').forEach(el => {
+                // ✅ CORRECTION: Vérifier que TOUTES les paires sont correctement appariées
+                const matchedElements = document.querySelectorAll('.matching-item.matched');
+                
+                // Organiser les éléments matchés par paire
+                const matchedPairs = new Map();
+                matchedElements.forEach(el => {
                     const side = el.getAttribute('data-side');
                     const index = parseInt(el.getAttribute('data-index'));
-                    matchedPairs.push({ side, index });
+                    
+                    if (!matchedPairs.has(index)) {
+                        matchedPairs.set(index, {});
+                    }
+                    matchedPairs.get(index)[side] = true;
                 });
                 
-                isCorrect = true;
-                if (matchedPairs.length !== game.pairs.length) {
-                    isCorrect = false;
-                } else {
-                    for (let i = 0; i < matchedPairs.length; i++) {
-                        const pair = matchedPairs[i];
-                        
-                        const leftMatched = matchedPairs.filter(p => p.side === 'left' && p.index === pair.index).length;
-                        const rightMatched = matchedPairs.filter(p => p.side === 'right' && p.index === pair.index).length;
-                        
-                        if (!leftMatched || !rightMatched) {
-                            isCorrect = false;
-                            break;
-                        }
+                // Vérifier que chaque paire a un côté gauche ET un côté droit
+                isCorrect = matchedPairs.size === game.pairs.length;
+                for (let [pairIndex, sides] of matchedPairs) {
+                    if (!sides.left || !sides.right) {
+                        isCorrect = false;
+                        break;
                     }
                 }
                 
-                answer = matchedPairs;
+                answer = Array.from(matchedPairs.keys());
                 
                 console.log('🔍 MATCHING:', {
-                    matchedPairs: matchedPairs,
+                    matchedPairs: answer,
                     totalPairs: game.pairs.length,
                     isCorrect: isCorrect,
-                    game_pairs: game.pairs
+                    elapsedTime: elapsedTime + 's'
                 });
             }
 
-            console.log('📤 Envoi:', { answer, isCorrect, gameType: game.type });
+            console.log('📤 Envoi:', { answer, isCorrect, gameType: game.type, elapsedTime });
 
             database.ref('sessions/' + sessionId + '/teams/' + teamId).update({
                 hasAnswered: true,
                 answer: answer,
-                isCorrect: isCorrect
+                isCorrect: isCorrect,
+                answerTime: elapsedTime // ✅ NOUVEAU: Enregistrer le temps
             }).then(() => {
-                console.log('✅ Réponse sauvegardée avec isCorrect:', isCorrect);
+                console.log('✅ Réponse sauvegardée avec isCorrect:', isCorrect, 'Temps:', elapsedTime + 's');
                 const countRef = database.ref('sessions/' + sessionId + '/answersCount');
                 return countRef.transaction((currentCount) => {
                     return (currentCount || 0) + 1;
@@ -1912,33 +1956,37 @@
                 }
 
                 const points = team.lastPoints || 0;
+                const speedBonus = team.lastSpeedBonus || 0; // ✅ NOUVEAU
                 const hasAnswered = team.hasAnswered || false;
                 const answer = team.answer;
 
-                console.log('📊 Résultat stagiaire:', { points, hasAnswered, answer, isCorrect: team.isCorrect });
+                console.log('📊 Résultat stagiaire:', { points, speedBonus, hasAnswered, answer });
 
                 if (!hasAnswered || answer === null || answer === undefined) {
                     document.getElementById('trainee-result-icon').textContent = '⏰';
                     document.getElementById('trainee-result-title').textContent = 'Temps écoulé !';
                     document.getElementById('trainee-result-title').className = 'text-5xl md:text-6xl font-bold mb-6 text-orange-600';
                     document.getElementById('trainee-points-earned').textContent = '0';
+                    document.getElementById('points-bonus').textContent = '';
                 } else if (points > 0) {
                     document.getElementById('trainee-result-icon').textContent = '✓';
                     document.getElementById('trainee-result-title').textContent = 'Bonne réponse !';
                     document.getElementById('trainee-result-title').className = 'text-5xl md:text-6xl font-bold mb-6 text-green-600';
                     document.getElementById('trainee-points-earned').textContent = '+' + points;
+                    document.getElementById('points-bonus').textContent = speedBonus > 0 ? `⚡ Bonus vitesse: +${speedBonus} pts` : '';
                 } else {
                     document.getElementById('trainee-result-icon').textContent = '✗';
                     document.getElementById('trainee-result-title').textContent = 'Mauvaise réponse';
                     document.getElementById('trainee-result-title').className = 'text-5xl md:text-6xl font-bold mb-6 text-red-600';
                     document.getElementById('trainee-points-earned').textContent = '0';
+                    document.getElementById('points-bonus').textContent = '';
                 }
 
                 document.getElementById('trainee-total-score').textContent = (team.score || 0) + ' pts';
             });
         }
 
-        // ✅ ADMINISTRATION FONCTIONS
+        // ADMINISTRATION
         document.getElementById('admin-btn').addEventListener('click', () => {
             showScreenSafe('admin-panel');
             loadAdminSettings();
@@ -1954,7 +2002,7 @@
             showScreenSafe('supervisor-dashboard');
         });
 
-        // ✅ TABS NAVIGATION
+        // TABS NAVIGATION
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const tabName = btn.id.replace('tab-', '');
@@ -1967,18 +2015,20 @@
             });
         });
 
-        // ✅ CHARGER ET SAUVEGARDER LES PARAMÈTRES
+        // CHARGER ET SAUVEGARDER PARAMÈTRES
         function loadAdminSettings() {
             const savedSettings = localStorage.getItem('adminSettings');
             if (savedSettings) {
                 const settings = JSON.parse(savedSettings);
                 QUESTION_TIME = settings.questionTime || 30;
                 POINTS_PER_ANSWER = settings.pointsPerAnswer || 150;
+                SPEED_BONUS_MAX = settings.speedBonusMax || 100; // ✅ NOUVEAU
                 SYNC_DELAY = settings.syncDelay || 800;
                 QUESTIONS_PER_BOX = settings.questionsPerBox || 7;
                 
                 document.getElementById('question-time').value = QUESTION_TIME;
                 document.getElementById('points-per-answer').value = POINTS_PER_ANSWER;
+                document.getElementById('speed-bonus').value = SPEED_BONUS_MAX; // ✅ NOUVEAU
                 document.getElementById('sync-delay').value = SYNC_DELAY;
                 document.getElementById('questions-per-box').value = QUESTIONS_PER_BOX;
                 
@@ -1989,12 +2039,14 @@
         document.getElementById('save-settings-btn').addEventListener('click', () => {
             QUESTION_TIME = parseInt(document.getElementById('question-time').value);
             POINTS_PER_ANSWER = parseInt(document.getElementById('points-per-answer').value);
+            SPEED_BONUS_MAX = parseInt(document.getElementById('speed-bonus').value); // ✅ NOUVEAU
             SYNC_DELAY = parseInt(document.getElementById('sync-delay').value);
             QUESTIONS_PER_BOX = parseInt(document.getElementById('questions-per-box').value);
             
             const settings = {
                 questionTime: QUESTION_TIME,
                 pointsPerAnswer: POINTS_PER_ANSWER,
+                speedBonusMax: SPEED_BONUS_MAX, // ✅ NOUVEAU
                 syncDelay: SYNC_DELAY,
                 questionsPerBox: QUESTIONS_PER_BOX
             };
@@ -2004,7 +2056,6 @@
             console.log('💾 Paramètres sauvegardés:', settings);
         });
 
-        // ✅ CHARGER LES QUESTIONS
         function loadQuestionsForAdmin() {
             const questionsList = document.getElementById('questions-list');
             let html = '';
@@ -2036,7 +2087,6 @@
             questionsList.innerHTML = html;
         }
 
-        // ✅ CHARGER LES RÉPONSES
         function loadAnswersForAdmin() {
             const answersList = document.getElementById('answers-list');
             let html = '';
@@ -2066,7 +2116,6 @@
             answersList.innerHTML = html;
         }
 
-        // ✅ ÉDITER UNE QUESTION
         window.editQuestion = function(boxIdx, gameIdx) {
             const game = BOXES_DATA[boxIdx].games[gameIdx];
             const newQuestion = prompt('Nouvelle question:', game.question);
@@ -2079,7 +2128,6 @@
             }
         }
 
-        // ✅ SAUVEGARDER UNE JUSTIFICATION
         window.saveExplanation = function(boxIdx, gameIdx) {
             const explanation = document.getElementById(`explanation-${boxIdx}-${gameIdx}`).value;
             BOXES_DATA[boxIdx].games[gameIdx].explanation = explanation;
