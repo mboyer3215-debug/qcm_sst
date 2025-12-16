@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QCM SST - Formation Interactive</title>
+    <title>QCM SST Synchronisé - Formation Interactive</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -197,6 +197,64 @@
             max-height: 600px;
             overflow-y: auto;
         }
+
+        /* ✅ STYLE PASSWORD INPUT */
+        .password-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        #supervisor-password {
+            padding-right: 45px;
+            font-size: 1.2rem;
+            letter-spacing: 2px;
+        }
+
+        .password-toggle {
+            position: absolute;
+            right: 12px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.3rem;
+            color: #5D5CDE;
+            padding: 8px;
+            transition: all 0.3s;
+        }
+
+        .password-toggle:hover {
+            transform: scale(1.2);
+            color: #7B7AFF;
+        }
+
+        .password-feedback {
+            position: absolute;
+            top: -35px;
+            left: 0;
+            background: #10b981;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            opacity: 0;
+            transition: all 0.3s;
+            white-space: nowrap;
+            pointer-events: none;
+        }
+
+        .password-feedback.show {
+            opacity: 1;
+            top: -40px;
+            animation: fadeOut 1s ease-in-out forwards;
+            animation-delay: 0.5s;
+        }
+
+        @keyframes fadeOut {
+            0% { opacity: 1; }
+            100% { opacity: 0; }
+        }
     </style>
     <script>
         tailwind.config = {
@@ -229,7 +287,25 @@
                 <form id="supervisor-login-form" class="space-y-6">
                     <div>
                         <label for="supervisor-password" class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Mot de passe</label>
-                        <input type="password" id="supervisor-password" placeholder="••••••••••••" class="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white text-base focus:border-primary focus:outline-none" required>
+                        <!-- ✅ PASSWORD INPUT AVEC ŒIL -->
+                        <div class="password-wrapper relative">
+                            <div class="password-feedback" id="password-feedback">✓ Caractère affiché</div>
+                            <input 
+                                type="password" 
+                                id="supervisor-password" 
+                                placeholder="••••••••••••" 
+                                class="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white text-base focus:border-primary focus:outline-none"
+                                required
+                            >
+                            <button 
+                                type="button" 
+                                id="password-toggle" 
+                                class="password-toggle"
+                                title="Afficher/Masquer le mot de passe"
+                            >
+                                👁️
+                            </button>
+                        </div>
                     </div>
                     <div id="login-error" class="hidden text-red-600 dark:text-red-400 text-sm font-semibold text-center bg-red-50 dark:bg-red-900/20 p-3 rounded-lg">❌ Mot de passe incorrect</div>
                     <button type="submit" class="w-full bg-gradient-to-r from-primary via-purple-600 to-pink-600 text-white text-xl font-bold py-4 rounded-xl shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all">🔓 Déverrouiller</button>
@@ -506,6 +582,63 @@
     </div>
 
     <script>
+        // ✅ JAVASCRIPT POUR LE MOT DE PASSE AVEC AFFICHAGE 1 SECONDE ET ŒIL
+        document.addEventListener('DOMContentLoaded', () => {
+            const passwordInput = document.getElementById('supervisor-password');
+            const passwordToggle = document.getElementById('password-toggle');
+            const passwordFeedback = document.getElementById('password-feedback');
+            let isPasswordVisible = false;
+            let hideTimeout = null;
+
+            // ✅ Bouton œil pour afficher/masquer le mot de passe
+            passwordToggle.addEventListener('click', (e) => {
+                e.preventDefault();
+                isPasswordVisible = !isPasswordVisible;
+                
+                if (isPasswordVisible) {
+                    passwordInput.type = 'text';
+                    passwordToggle.textContent = '👁️‍🗨️';
+                    passwordToggle.style.color = '#10b981';
+                } else {
+                    passwordInput.type = 'password';
+                    passwordToggle.textContent = '👁️';
+                    passwordToggle.style.color = '#5D5CDE';
+                }
+            });
+
+            // ✅ Afficher 1 seconde en clair après chaque saisie
+            passwordInput.addEventListener('input', () => {
+                // Nettoyer le timeout précédent
+                if (hideTimeout) clearTimeout(hideTimeout);
+
+                // Afficher en clair temporairement
+                passwordInput.type = 'text';
+                passwordToggle.textContent = '👁️‍🗨️';
+                isPasswordVisible = true;
+
+                // Afficher le feedback
+                passwordFeedback.classList.add('show');
+                setTimeout(() => {
+                    passwordFeedback.classList.remove('show');
+                }, 1500);
+
+                // Masquer après 1 seconde
+                hideTimeout = setTimeout(() => {
+                    passwordInput.type = 'password';
+                    passwordToggle.textContent = '👁️';
+                    isPasswordVisible = false;
+                }, 1000);
+            });
+
+            // Quand on quitte le champ, masquer le mot de passe
+            passwordInput.addEventListener('blur', () => {
+                if (hideTimeout) clearTimeout(hideTimeout);
+                passwordInput.type = 'password';
+                passwordToggle.textContent = '👁️';
+                isPasswordVisible = false;
+            });
+        });
+
         // Configuration Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyAZLBDZIaPp3GrXuVz4fPiK91JhLEqXPs0",
@@ -535,19 +668,16 @@
         let timeRemaining = 30;
         let gameStatusListener = null;
         let currentGameListener = null;
-        let questionStartTime = null; // ✅ NOUVEAU: Enregistrer l'heure de début
+        let questionStartTime = null;
 
         const SUPERVISOR_PASSWORD = "sst2025";
         const QUESTION_TIME_LIMIT = 30;
 
-        // ✅ VARIABLES ADMIN GLOBALES
         let QUESTION_TIME = 30;
         let POINTS_PER_ANSWER = 150;
-        let SPEED_BONUS_MAX = 100; // ✅ NOUVEAU: Bonus vitesse maximum
+        let SPEED_BONUS_MAX = 100;
         let SYNC_DELAY = 800;
         let QUESTIONS_PER_BOX = 7;
-
-        // ... (Rest of the code continues with all previous functions)
 
         // Sauvegarder la session en mettant à jour l'URL
         function saveTraineeSessionToURL() {
@@ -705,7 +835,7 @@
         // Démarrer le timer
         function startQuestionTimer() {
             timeRemaining = QUESTION_TIME;
-            questionStartTime = Date.now(); // ✅ Enregistrer l'heure de début
+            questionStartTime = Date.now();
             document.getElementById('timer-display').textContent = timeRemaining;
             document.getElementById('timer-display').style.color = 'white';
 
@@ -795,7 +925,7 @@
             });
         }
 
-        // Base de données des questions SST
+        // Base de données des questions SST (même que précédemment)
         let BOXES_DATA = [
             {
                 title: 'DC4 - Prévention',
@@ -859,7 +989,7 @@
             }
         ];
 
-        // Fonctions utilitaires
+        // Fonctions utilitaires (même que précédemment)
         function showScreen(screenId) {
             document.querySelectorAll('#app > div').forEach(screen => screen.classList.add('hidden'));
             document.getElementById(screenId).classList.remove('hidden');
@@ -919,7 +1049,7 @@
             });
         }
 
-        // ✅ FONCTION POUR CALCULER LES POINTS AVEC BONUS VITESSE
+        // Calculer les points avec bonus vitesse
         function calculatePointsWithSpeedBonus(isCorrect, elapsedTime) {
             if (!isCorrect) {
                 return 0;
@@ -928,11 +1058,7 @@
             const basePoints = POINTS_PER_ANSWER;
             let speedBonus = 0;
 
-            // Calculer le bonus de vitesse (plus rapide = plus de points)
-            // Si répondre avant 5 secondes = 100% du bonus
-            // Si répondre après QUESTION_TIME-5 secondes = 0% du bonus
-            const speedWindowStart = 0;
-            const speedWindowEnd = QUESTION_TIME - 5; // Dernières 5 secondes = pas de bonus
+            const speedWindowEnd = QUESTION_TIME - 5;
 
             if (elapsedTime < speedWindowEnd) {
                 const speedRatio = 1 - (elapsedTime / speedWindowEnd);
@@ -940,7 +1066,7 @@
             }
 
             const totalPoints = basePoints + speedBonus;
-            console.log('📊 Calcul points - Temps: ${elapsedTime}s, Base: ${basePoints}, Bonus: ${speedBonus}, Total: ${totalPoints}');
+            console.log(`📊 Calcul points - Temps: ${elapsedTime}s, Base: ${basePoints}, Bonus: ${speedBonus}, Total: ${totalPoints}`);
             
             return { basePoints, speedBonus, totalPoints };
         }
@@ -1196,7 +1322,7 @@
                     updates['sessions/' + sessionId + '/teams/' + id + '/answer'] = null;
                     updates['sessions/' + sessionId + '/teams/' + id + '/isCorrect'] = false;
                     updates['sessions/' + sessionId + '/teams/' + id + '/lastPoints'] = 0;
-                    updates['sessions/' + sessionId + '/teams/' + id + '/answerTime'] = 0; // ✅ NOUVEAU
+                    updates['sessions/' + sessionId + '/teams/' + id + '/answerTime'] = 0;
                 });
 
                 console.log('🔄 Réinitialisation des flags pour', Object.keys(teams).length, 'équipes');
@@ -1376,7 +1502,6 @@
                     let pointsData = { basePoints: 0, speedBonus: 0, totalPoints: 0 };
                     
                     if (team.isCorrect === true && team.answerTime !== undefined) {
-                        // ✅ Calculer les points avec bonus vitesse
                         pointsData = calculatePointsWithSpeedBonus(true, team.answerTime);
                     } else if (team.isCorrect === false) {
                         pointsData = { basePoints: 0, speedBonus: 0, totalPoints: 0 };
@@ -1562,7 +1687,7 @@
                 name: teamName,
                 score: 0,
                 hasAnswered: false,
-                answerTime: 0, // ✅ NOUVEAU
+                answerTime: 0,
                 joinedAt: Date.now()
             }).then(() => {
                 console.log('✅ Équipe créée:', teamName, teamId);
@@ -1819,7 +1944,6 @@
                 selectedMatching.push({ side, index });
 
                 if (selectedMatching.length === 2) {
-                    // ✅ VÉRIFIER QUE LES DEUX INDICES CORRESPONDENT
                     if (selectedMatching[0].index === selectedMatching[1].index && 
                         selectedMatching[0].side !== selectedMatching[1].side) {
                         
@@ -1848,7 +1972,6 @@
             }
         }
 
-        // ✅ FONCTION VALIDÉE AVEC BONUS VITESSE ET APPAIRAGE CORRIGÉ
         function validateTraineeAnswer(game) {
             const btn = document.getElementById('trainee-validate-btn');
             if (btn.disabled) return;
@@ -1856,7 +1979,6 @@
             btn.textContent = '⏳ Envoi en cours...';
             btn.classList.add('opacity-50', 'cursor-not-allowed');
 
-            // ✅ Calculer le temps écoulé
             const elapsedTime = Math.round((Date.now() - questionStartTime) / 1000);
 
             let answer = null;
@@ -1885,10 +2007,8 @@
                 });
             } 
             else if (game.type === 'matching') {
-                // ✅ CORRECTION: Vérifier que TOUTES les paires sont correctement appariées
                 const matchedElements = document.querySelectorAll('.matching-item.matched');
                 
-                // Organiser les éléments matchés par paire
                 const matchedPairs = new Map();
                 matchedElements.forEach(el => {
                     const side = el.getAttribute('data-side');
@@ -1900,7 +2020,6 @@
                     matchedPairs.get(index)[side] = true;
                 });
                 
-                // Vérifier que chaque paire a un côté gauche ET un côté droit
                 isCorrect = matchedPairs.size === game.pairs.length;
                 for (let [pairIndex, sides] of matchedPairs) {
                     if (!sides.left || !sides.right) {
@@ -1925,7 +2044,7 @@
                 hasAnswered: true,
                 answer: answer,
                 isCorrect: isCorrect,
-                answerTime: elapsedTime // ✅ NOUVEAU: Enregistrer le temps
+                answerTime: elapsedTime
             }).then(() => {
                 console.log('✅ Réponse sauvegardée avec isCorrect:', isCorrect, 'Temps:', elapsedTime + 's');
                 const countRef = database.ref('sessions/' + sessionId + '/answersCount');
@@ -1956,7 +2075,7 @@
                 }
 
                 const points = team.lastPoints || 0;
-                const speedBonus = team.lastSpeedBonus || 0; // ✅ NOUVEAU
+                const speedBonus = team.lastSpeedBonus || 0;
                 const hasAnswered = team.hasAnswered || false;
                 const answer = team.answer;
 
@@ -2015,20 +2134,20 @@
             });
         });
 
-        // CHARGER ET SAUVEGARDER PARAMÈTRES
+        // CHARGER PARAMÈTRES
         function loadAdminSettings() {
             const savedSettings = localStorage.getItem('adminSettings');
             if (savedSettings) {
                 const settings = JSON.parse(savedSettings);
                 QUESTION_TIME = settings.questionTime || 30;
                 POINTS_PER_ANSWER = settings.pointsPerAnswer || 150;
-                SPEED_BONUS_MAX = settings.speedBonusMax || 100; // ✅ NOUVEAU
+                SPEED_BONUS_MAX = settings.speedBonusMax || 100;
                 SYNC_DELAY = settings.syncDelay || 800;
                 QUESTIONS_PER_BOX = settings.questionsPerBox || 7;
                 
                 document.getElementById('question-time').value = QUESTION_TIME;
                 document.getElementById('points-per-answer').value = POINTS_PER_ANSWER;
-                document.getElementById('speed-bonus').value = SPEED_BONUS_MAX; // ✅ NOUVEAU
+                document.getElementById('speed-bonus').value = SPEED_BONUS_MAX;
                 document.getElementById('sync-delay').value = SYNC_DELAY;
                 document.getElementById('questions-per-box').value = QUESTIONS_PER_BOX;
                 
@@ -2039,14 +2158,14 @@
         document.getElementById('save-settings-btn').addEventListener('click', () => {
             QUESTION_TIME = parseInt(document.getElementById('question-time').value);
             POINTS_PER_ANSWER = parseInt(document.getElementById('points-per-answer').value);
-            SPEED_BONUS_MAX = parseInt(document.getElementById('speed-bonus').value); // ✅ NOUVEAU
+            SPEED_BONUS_MAX = parseInt(document.getElementById('speed-bonus').value);
             SYNC_DELAY = parseInt(document.getElementById('sync-delay').value);
             QUESTIONS_PER_BOX = parseInt(document.getElementById('questions-per-box').value);
             
             const settings = {
                 questionTime: QUESTION_TIME,
                 pointsPerAnswer: POINTS_PER_ANSWER,
-                speedBonusMax: SPEED_BONUS_MAX, // ✅ NOUVEAU
+                speedBonusMax: SPEED_BONUS_MAX,
                 syncDelay: SYNC_DELAY,
                 questionsPerBox: QUESTIONS_PER_BOX
             };
