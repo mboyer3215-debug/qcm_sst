@@ -189,6 +189,22 @@
             width: 100% !important;
             -webkit-overflow-scrolling: touch;
         }
+
+        .tab-btn {
+            cursor: pointer;
+            opacity: 0.7;
+            transition: all 0.3s;
+        }
+
+        .tab-btn.active {
+            opacity: 1;
+            box-shadow: 0 0 20px rgba(93, 92, 222, 0.6);
+        }
+
+        .tab-content {
+            max-height: 600px;
+            overflow-y: auto;
+        }
     </style>
     <script>
         tailwind.config = {
@@ -252,6 +268,7 @@
 
             <div class="flex flex-col md:flex-row gap-4 mb-6">
                 <button id="start-game-btn" class="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white text-xl font-bold py-5 rounded-xl shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all">🚀 Lancer le Jeu</button>
+                <button id="admin-btn" class="px-8 bg-gradient-to-r from-purple-500 to-indigo-600 text-white text-xl font-bold py-5 rounded-xl shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all">⚙️ Administration</button>
                 <button id="reset-game-btn" class="px-8 bg-gradient-to-r from-red-500 to-red-600 text-white text-xl font-bold py-5 rounded-xl shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all">🔄 Réinitialiser</button>
             </div>
         </div>
@@ -418,6 +435,75 @@
             </div>
         </div>
 
+        <!-- ✅ ÉCRAN ADMINISTRATION -->
+        <div id="admin-panel" class="hidden max-w-7xl mx-auto">
+            <div class="text-center mb-6">
+                <h1 class="text-4xl md:text-5xl font-bold text-primary neon-text mb-2">⚙️ Panneau d'Administration</h1>
+                <p class="text-lg text-gray-600 dark:text-gray-400">Gérez les paramètres du jeu</p>
+            </div>
+
+            <!-- Tabs Navigation -->
+            <div class="flex flex-wrap gap-2 mb-6 justify-center">
+                <button id="tab-settings" class="tab-btn active px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg font-bold shadow-lg">⏱️ Paramètres</button>
+                <button id="tab-questions" class="tab-btn px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg font-bold shadow-lg">📝 Questions</button>
+                <button id="tab-answers" class="tab-btn px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-lg font-bold shadow-lg">✓ Réponses</button>
+                <button id="close-admin-btn" class="px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg font-bold shadow-lg">❌ Fermer</button>
+            </div>
+
+            <!-- TAB 1: Paramètres -->
+            <div id="content-settings" class="tab-content glass-morphism rounded-3xl shadow-2xl p-8 mb-6">
+                <h2 class="text-2xl font-bold text-gray-800 dark:text-white mb-6">⏱️ Paramètres Globaux</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-lg font-bold text-gray-800 dark:text-white mb-2">Délai de réponse (secondes)</label>
+                        <input type="number" id="question-time" min="10" max="120" value="30" class="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white">
+                        <p class="text-sm text-gray-600 dark:text-gray-400 mt-2">Temps pour répondre à une question</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-lg font-bold text-gray-800 dark:text-white mb-2">Points par bonne réponse</label>
+                        <input type="number" id="points-per-answer" min="10" max="500" value="150" class="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white">
+                        <p class="text-sm text-gray-600 dark:text-gray-400 mt-2">Points attribués pour une réponse correcte</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-lg font-bold text-gray-800 dark:text-white mb-2">Délai de synchronisation (ms)</label>
+                        <input type="number" id="sync-delay" min="100" max="2000" step="100" value="800" class="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white">
+                        <p class="text-sm text-gray-600 dark:text-gray-400 mt-2">Délai avant affichage des questions chez les stagiaires</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-lg font-bold text-gray-800 dark:text-white mb-2">Questions par coffre</label>
+                        <input type="number" id="questions-per-box" min="3" max="15" value="7" class="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white">
+                        <p class="text-sm text-gray-600 dark:text-gray-400 mt-2">Nombre de questions par coffre</p>
+                    </div>
+                </div>
+
+                <button id="save-settings-btn" class="mt-6 bg-gradient-to-r from-green-500 to-emerald-600 text-white text-lg font-bold py-3 px-8 rounded-xl shadow-lg hover:shadow-2xl">💾 Enregistrer Paramètres</button>
+            </div>
+
+            <!-- TAB 2: Questions -->
+            <div id="content-questions" class="tab-content hidden glass-morphism rounded-3xl shadow-2xl p-8 mb-6">
+                <h2 class="text-2xl font-bold text-gray-800 dark:text-white mb-6">📝 Gestion des Questions</h2>
+                
+                <div class="space-y-4" id="questions-list">
+                    <div class="text-center text-gray-500">Chargement des questions...</div>
+                </div>
+            </div>
+
+            <!-- TAB 3: Réponses -->
+            <div id="content-answers" class="tab-content hidden glass-morphism rounded-3xl shadow-2xl p-8 mb-6">
+                <h2 class="text-2xl font-bold text-gray-800 dark:text-white mb-6">✓ Justifications et Réponses</h2>
+                
+                <div class="space-y-4" id="answers-list">
+                    <div class="text-center text-gray-500">Chargement des réponses...</div>
+                </div>
+            </div>
+
+            <button id="back-to-game-btn" class="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white text-lg font-bold py-4 rounded-xl shadow-lg hover:shadow-2xl">← Retour au jeu</button>
+        </div>
+
     </div>
 
     <script>
@@ -453,6 +539,12 @@
 
         const SUPERVISOR_PASSWORD = "sst2025";
         const QUESTION_TIME_LIMIT = 30;
+
+        // ✅ VARIABLES ADMIN GLOBALES
+        let QUESTION_TIME = 30;
+        let POINTS_PER_ANSWER = 150;
+        let SYNC_DELAY = 800;
+        let QUESTIONS_PER_BOX = 7;
 
         // Sauvegarder la session en mettant à jour l'URL
         function saveTraineeSessionToURL() {
@@ -618,9 +710,9 @@
             document.getElementById('app').scrollTop = 0;
         }
 
-        // Démarrer le timer de 30 secondes
+        // Démarrer le timer
         function startQuestionTimer() {
-            timeRemaining = QUESTION_TIME_LIMIT;
+            timeRemaining = QUESTION_TIME; // ✅ Utiliser la variable globale
             document.getElementById('timer-display').textContent = timeRemaining;
             document.getElementById('timer-display').style.color = 'white';
 
@@ -686,30 +778,6 @@
             });
         }
 
-        // Vérifier si toutes les équipes ont répondu
-        function checkIfAllAnswered() {
-            database.ref('sessions/' + sessionId + '/teams').once('value', (teamsSnapshot) => {
-                const teams = teamsSnapshot.val();
-                if (!teams) return;
-
-                const totalTeams = Object.keys(teams).length;
-
-                database.ref('sessions/' + sessionId + '/answersCount').once('value', (countSnapshot) => {
-                    const count = countSnapshot.val() || 0;
-                    console.log('🔍 Vérification réponses:', count, '/', totalTeams);
-
-                    if (count >= totalTeams && totalTeams > 0) {
-                        console.log('✅ Tous ont répondu après timeout - passage correction');
-                        if (answersListener) {
-                            database.ref('sessions/' + sessionId + '/answersCount').off('value', answersListener);
-                            answersListener = null;
-                        }
-                        setTimeout(() => showCorrection(), 1000);
-                    }
-                });
-            });
-        }
-
         // Jouer le son de klaxon
         function playHornSound() {
             const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hZFQlMouLvuWgiCTGH0fPTgjMGHm7A7+OZUQ0PVKzn77NgGAg+ltry0XwpBSp+zO/ajEIJE2C18NBuJAIygdLy0n0qBSp+zO/bfSkFKoLS8tJ9KgUqftLv2n0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2X0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2n0pBSqB0vLSfSkFKoLS8tJ9KgUqftLv2X0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2n0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2X0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2n0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2X0qBSqC0vLSfSkFKoLS8tJ9KgUqftLv2n0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2X0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2n0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2X0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv2n0pBSqC0vLSfSkFKoLS8tJ9KgUqftLv');
@@ -735,7 +803,7 @@
         }
 
         // Base de données des questions SST
-        const BOXES_DATA = [
+        let BOXES_DATA = [
             {
                 title: 'DC4 - Prévention',
                 subtitle: 'Situations spécifiques et prévention',
@@ -865,7 +933,7 @@
                 const j = Math.floor(Math.random() * (i + 1));
                 [allGames[i], allGames[j]] = [allGames[j], allGames[i]];
             }
-            return allGames.slice(0, 7);
+            return allGames.slice(0, QUESTIONS_PER_BOX); // ✅ Utiliser la variable globale
         }
 
         // Préparer le jeu avec réponses mélangées
@@ -886,7 +954,7 @@
                 
                 shuffledGame.optionsWithIndex = optionsWithIndex;
                 shuffledGame.options = optionsWithIndex.map(o => o.text);
-                shuffledGame.correctAnswer = game.correctAnswer; // ✅ Garder correctAnswer inchangé
+                shuffledGame.correctAnswer = game.correctAnswer;
             }
             
             else if (game.type === 'sequence') {
@@ -903,7 +971,7 @@
                 
                 shuffledGame.itemsWithIndex = itemsWithIndex;
                 shuffledGame.items = itemsWithIndex.map(i => i.text);
-                shuffledGame.correctOrder = game.correctOrder; // ✅ Garder correctOrder inchangé
+                shuffledGame.correctOrder = game.correctOrder;
             }
             
             else if (game.type === 'matching') {
@@ -931,7 +999,7 @@
                 
                 shuffledGame.pairsLeft = pairsLeft;
                 shuffledGame.pairsRight = pairsRight;
-                shuffledGame.pairs = game.pairs; // ✅ Garder pairs original pour vérification
+                shuffledGame.pairs = game.pairs;
             }
 
             return shuffledGame;
@@ -944,6 +1012,7 @@
             if (password === SUPERVISOR_PASSWORD) {
                 userRole = 'supervisor';
                 sessionId = 'session_' + generateUUID();
+                loadAdminSettings();
                 initializeSupervisor();
             } else {
                 document.getElementById('login-error').classList.remove('hidden');
@@ -1038,7 +1107,7 @@
                         <h3 class="text-2xl font-bold text-gray-800 dark:text-white mb-2">${box.title}</h3>
                         <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">${box.subtitle}</p>
                         <div class="bg-gradient-to-r ${box.color} text-white px-6 py-3 rounded-xl font-bold text-lg mt-4">
-                            ${isDisabled ? '✅ Terminé' : '7 questions'}
+                            ${isDisabled ? '✅ Terminé' : QUESTIONS_PER_BOX + ' questions'}
                         </div>
                     </div>
                 `;
@@ -1061,7 +1130,6 @@
             loadGame();
         }
 
-        // ✅ FONCTION MODIFIÉE AVEC SYNCHRONISATION
         function loadGame() {
             console.log('🔄 Chargement Question', currentGameIndex);
 
@@ -1075,12 +1143,10 @@
                 resetAnswersFlags().then(() => {
                     console.log('✅ Flags hasAnswered réinitialisés');
 
-                    // ✅ METTRE À JOUR currentGame EN PREMIER
                     return database.ref('sessions/' + sessionId + '/currentGame').set(preparedGame);
                 }).then(() => {
                     console.log('✅ currentGame mis à jour');
                     
-                    // ✅ PUIS METTRE À JOUR LE RESTE (avec délai)
                     setTimeout(() => {
                         return database.ref('sessions/' + sessionId).update({
                             answersCount: 0,
@@ -1287,7 +1353,7 @@
                     let points = 0;
                     
                     if (team.isCorrect === true) {
-                        points = 150;
+                        points = POINTS_PER_ANSWER; // ✅ Utiliser la variable globale
                     }
                     
                     console.log('📊 Équipe:', team.name, '| isCorrect:', team.isCorrect, '| Points:', points);
@@ -1419,6 +1485,8 @@
 
         // Connexion Stagiaire - avec auto-reconnexion
         window.addEventListener('DOMContentLoaded', () => {
+            loadAdminSettings();
+            
             const urlParams = new URLSearchParams(window.location.search);
             const sessionParam = urlParams.get('session');
             const teamParam = urlParams.get('team');
@@ -1493,7 +1561,6 @@
             });
         });
 
-        // ✅ FONCTION MODIFIÉE AVEC DÉLAI
         function listenForGameUpdatesTrainee() {
             console.log('🎯 ACTIVATION du listener PERMANENT gameStatus');
             
@@ -1513,7 +1580,6 @@
                         currentGameListener = null;
                     }
 
-                    // ✅ ATTENDRE 800ms QUE LE JEU SOIT PRÊT
                     setTimeout(() => {
                         database.ref('sessions/' + sessionId + '/currentGame').once('value', (snap) => {
                             const game = snap.val();
@@ -1522,7 +1588,6 @@
                             if (game && game.question) {
                                 showTraineeGame(game);
                                 
-                                // Puis écouter les mises à jour
                                 database.ref('sessions/' + sessionId + '/currentGame').on('value', (updateSnap) => {
                                     console.log('🔄 currentGame mis à jour');
                                     currentGameListener = updateSnap.key;
@@ -1531,7 +1596,7 @@
                                 console.warn('⚠️ Game non valide reçu');
                             }
                         });
-                    }, 800); // ✅ DÉLAI DE 800ms
+                    }, SYNC_DELAY); // ✅ Utiliser la variable globale
                 } 
                 else if (gameStatus === 'correction') {
                     console.log('✅ Réception statut CORRECTION');
@@ -1745,7 +1810,6 @@
             }
         }
 
-        // ✅ FONCTION MODIFIÉE POUR QUESTIONS D'APPAIRAGE
         function validateTraineeAnswer(game) {
             const btn = document.getElementById('trainee-validate-btn');
             if (btn.disabled) return;
@@ -1778,7 +1842,6 @@
                 });
             } 
             else if (game.type === 'matching') {
-                // ✅ NOUVELLE LOGIQUE POUR MATCHING
                 const matchedPairs = [];
                 document.querySelectorAll('.matching-item.matched').forEach(el => {
                     const side = el.getAttribute('data-side');
@@ -1786,17 +1849,13 @@
                     matchedPairs.push({ side, index });
                 });
                 
-                // ✅ VÉRIFIER QUE TOUTES LES PAIRES SONT CORRECTES
                 isCorrect = true;
                 if (matchedPairs.length !== game.pairs.length) {
                     isCorrect = false;
                 } else {
-                    // Vérifier que chaque paire left/right correspond
                     for (let i = 0; i < matchedPairs.length; i++) {
                         const pair = matchedPairs[i];
                         
-                        // Pour chaque paire matchée, vérifier qu'elle correspond
-                        // Les deux éléments d'une paire doivent avoir le même originalIndex
                         const leftMatched = matchedPairs.filter(p => p.side === 'left' && p.index === pair.index).length;
                         const rightMatched = matchedPairs.filter(p => p.side === 'right' && p.index === pair.index).length;
                         
@@ -1879,6 +1938,155 @@
             });
         }
 
+        // ✅ ADMINISTRATION FONCTIONS
+        document.getElementById('admin-btn').addEventListener('click', () => {
+            showScreenSafe('admin-panel');
+            loadAdminSettings();
+            loadQuestionsForAdmin();
+            loadAnswersForAdmin();
+        });
+
+        document.getElementById('close-admin-btn').addEventListener('click', () => {
+            showScreenSafe('supervisor-dashboard');
+        });
+
+        document.getElementById('back-to-game-btn').addEventListener('click', () => {
+            showScreenSafe('supervisor-dashboard');
+        });
+
+        // ✅ TABS NAVIGATION
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tabName = btn.id.replace('tab-', '');
+                
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+                
+                btn.classList.add('active');
+                document.getElementById('content-' + tabName).classList.remove('hidden');
+            });
+        });
+
+        // ✅ CHARGER ET SAUVEGARDER LES PARAMÈTRES
+        function loadAdminSettings() {
+            const savedSettings = localStorage.getItem('adminSettings');
+            if (savedSettings) {
+                const settings = JSON.parse(savedSettings);
+                QUESTION_TIME = settings.questionTime || 30;
+                POINTS_PER_ANSWER = settings.pointsPerAnswer || 150;
+                SYNC_DELAY = settings.syncDelay || 800;
+                QUESTIONS_PER_BOX = settings.questionsPerBox || 7;
+                
+                document.getElementById('question-time').value = QUESTION_TIME;
+                document.getElementById('points-per-answer').value = POINTS_PER_ANSWER;
+                document.getElementById('sync-delay').value = SYNC_DELAY;
+                document.getElementById('questions-per-box').value = QUESTIONS_PER_BOX;
+                
+                console.log('✅ Paramètres admin chargés:', settings);
+            }
+        }
+
+        document.getElementById('save-settings-btn').addEventListener('click', () => {
+            QUESTION_TIME = parseInt(document.getElementById('question-time').value);
+            POINTS_PER_ANSWER = parseInt(document.getElementById('points-per-answer').value);
+            SYNC_DELAY = parseInt(document.getElementById('sync-delay').value);
+            QUESTIONS_PER_BOX = parseInt(document.getElementById('questions-per-box').value);
+            
+            const settings = {
+                questionTime: QUESTION_TIME,
+                pointsPerAnswer: POINTS_PER_ANSWER,
+                syncDelay: SYNC_DELAY,
+                questionsPerBox: QUESTIONS_PER_BOX
+            };
+            
+            localStorage.setItem('adminSettings', JSON.stringify(settings));
+            showCustomAlert('✅ Paramètres sauvegardés avec succès !');
+            console.log('💾 Paramètres sauvegardés:', settings);
+        });
+
+        // ✅ CHARGER LES QUESTIONS
+        function loadQuestionsForAdmin() {
+            const questionsList = document.getElementById('questions-list');
+            let html = '';
+            
+            BOXES_DATA.forEach((box, boxIdx) => {
+                html += `
+                    <div class="bg-white dark:bg-gray-700 p-4 rounded-lg mb-4">
+                        <h3 class="text-xl font-bold text-gray-800 dark:text-white mb-3">${box.title}</h3>
+                        <div class="space-y-3">
+                `;
+                
+                box.games.forEach((game, gameIdx) => {
+                    html += `
+                        <div class="bg-gray-100 dark:bg-gray-600 p-3 rounded-lg">
+                            <div class="flex justify-between items-start mb-2">
+                                <div>
+                                    <p class="font-bold text-gray-800 dark:text-white">${game.question}</p>
+                                    <p class="text-sm text-gray-600 dark:text-gray-400">Type: ${game.type}</p>
+                                </div>
+                                <button onclick="editQuestion(${boxIdx}, ${gameIdx})" class="px-3 py-1 bg-blue-500 text-white rounded text-sm">✏️ Éditer</button>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                html += `</div></div>`;
+            });
+            
+            questionsList.innerHTML = html;
+        }
+
+        // ✅ CHARGER LES RÉPONSES
+        function loadAnswersForAdmin() {
+            const answersList = document.getElementById('answers-list');
+            let html = '';
+            
+            BOXES_DATA.forEach((box, boxIdx) => {
+                html += `
+                    <div class="bg-white dark:bg-gray-700 p-4 rounded-lg mb-4">
+                        <h3 class="text-xl font-bold text-gray-800 dark:text-white mb-3">${box.title}</h3>
+                        <div class="space-y-3">
+                `;
+                
+                box.games.forEach((game, gameIdx) => {
+                    html += `
+                        <div class="bg-gray-100 dark:bg-gray-600 p-3 rounded-lg">
+                            <div class="mb-2">
+                                <p class="font-bold text-gray-800 dark:text-white mb-1">Q: ${game.question}</p>
+                                <textarea class="w-full px-3 py-2 border rounded text-sm dark:bg-gray-700 dark:text-white" placeholder="Justification..." id="explanation-${boxIdx}-${gameIdx}">${game.explanation || ''}</textarea>
+                                <button onclick="saveExplanation(${boxIdx}, ${gameIdx})" class="mt-2 px-3 py-1 bg-green-500 text-white rounded text-sm">💾 Sauvegarder</button>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                html += `</div></div>`;
+            });
+            
+            answersList.innerHTML = html;
+        }
+
+        // ✅ ÉDITER UNE QUESTION
+        window.editQuestion = function(boxIdx, gameIdx) {
+            const game = BOXES_DATA[boxIdx].games[gameIdx];
+            const newQuestion = prompt('Nouvelle question:', game.question);
+            
+            if (newQuestion) {
+                BOXES_DATA[boxIdx].games[gameIdx].question = newQuestion;
+                localStorage.setItem('boxesData', JSON.stringify(BOXES_DATA));
+                loadQuestionsForAdmin();
+                showCustomAlert('✅ Question modifiée !');
+            }
+        }
+
+        // ✅ SAUVEGARDER UNE JUSTIFICATION
+        window.saveExplanation = function(boxIdx, gameIdx) {
+            const explanation = document.getElementById(`explanation-${boxIdx}-${gameIdx}`).value;
+            BOXES_DATA[boxIdx].games[gameIdx].explanation = explanation;
+            localStorage.setItem('boxesData', JSON.stringify(BOXES_DATA));
+            showCustomAlert('✅ Justification sauvegardée !');
+        }
+
         document.getElementById('reset-game-btn').addEventListener('click', () => {
             showConfirmDialog('Voulez-vous vraiment réinitialiser la session ?', () => {
                 database.ref('sessions/' + sessionId).remove();
@@ -1893,4 +2101,4 @@
 
     </script>
 </body>
-    </html>
+</html>
