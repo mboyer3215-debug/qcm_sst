@@ -362,7 +362,8 @@
                 <h3 class="text-2xl font-bold mb-4">Classement Final</h3>
                 <div id="full-ranking-list"></div>
             </div>
-            <div class="flex flex-col md:flex-row gap-4 justify-center">
+            <!-- ✅ Boutons réservés au superviseur uniquement -->
+            <div id="podium-supervisor-btns" class="hidden flex-col md:flex-row gap-4 justify-center">
                 <button id="back-dashboard-podium-btn" class="px-10 bg-gradient-to-r from-gray-600 to-gray-700 text-white text-xl font-bold py-4 rounded-xl shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all">🏠 Retour Dashboard</button>
                 <button id="restart-game-btn" class="px-10 sst-gradient text-white text-xl font-bold py-4 rounded-xl shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all">🔄 Nouvelle Session</button>
             </div>
@@ -447,20 +448,20 @@
 <script>
 /* ===== FIREBASE CONFIG ===== */
 const firebaseConfig = {
-    apiKey: "AIzaSyCaC1Es9tHcM8l8oCTWoU8jz5riDWTwnJY",
-    authDomain: "mib-challenge-cup.firebaseapp.com",
-    databaseURL: "https://mib-challenge-cup-default-rtdb.europe-west1.firebasedatabase.app",
-    projectId: "mib-challenge-cup",
-    storageBucket: "mib-challenge-cup.firebasestorage.app",
-    messagingSenderId: "281519460435",
-    appId: "1:281519460435:web:1d77901c374fe4570936a6"
+    apiKey: "AIzaSyAZLBDZIaPp3GrXuVz4fPiK91JhLEqXPs0",
+    authDomain: "jeu-sst-v1-291025.firebaseapp.com",
+    databaseURL: "https://jeu-sst-v1-291025-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "jeu-sst-v1-291025",
+    storageBucket: "jeu-sst-v1-291025.firebasestorage.app",
+    messagingSenderId: "57462613537",
+    appId: "1:57462613537:web:6178195b2f4f08fbaa2560"
 };
 
 /* ===== VARIABLES GLOBALES ===== */
 let database=null, sessionId=null, userRole=null;
 let teamName=null, teamId=null;
 let currentBox=0, currentGameIndex=0;
-let selectedAnswer=null, selectedSequence=[], selectedMatching=[], selectedMultiple=[], selectedRanking=[];
+let selectedAnswer=null, selectedSequence=[], selectedMultiple=[], selectedRanking=[];
 let fillBlankAnswers=[];
 let openedBoxes=[];
 let answersListener=null, timerInterval=null, timeRemaining=30;
@@ -475,8 +476,6 @@ let QUESTION_TIME=30, POINTS_PER_ANSWER=150, SPEED_BONUS_MAX=100, SYNC_DELAY=800
 
 /* ===== DONNÉES QUESTIONS SST ===== */
 let BOXES_DATA = [
-
-    // ===== BOX 1 — PROTECTION & ALERTE =====
     {
         title: 'Protection & Alerte',
         subtitle: 'La règle PAS',
@@ -559,7 +558,6 @@ let BOXES_DATA = [
         ]
     },
 
-    // ===== BOX 2 — EXAMEN DE LA VICTIME =====
     {
         title: 'Examen Victime',
         subtitle: 'Évaluer l\'état',
@@ -642,7 +640,6 @@ let BOXES_DATA = [
         ]
     },
 
-    // ===== BOX 3 — GESTES DE SECOURS =====
     {
         title: 'Gestes de Secours',
         subtitle: 'Agir efficacement',
@@ -666,7 +663,7 @@ let BOXES_DATA = [
               question:'Remettez dans l\'ordre les étapes de la compression d\'une hémorragie :',
               items:['Se protéger les mains (gants si disponibles)','Appuyer fermement sur la plaie avec un tissu propre plié en épaisseur','Maintenir la pression constante et forte sans relâcher','Alerter les secours et surveiller la victime'],
               correctOrder:[0,1,2,3],
-              explanation:'Protection du sauveteur → compression → maintien → alerte. Si aucun tissu disponible, la paume de la main suffit. La protection du sauveteur est importante pour éviter la transmission d\'infections.' },
+              explanation:'Protection du sauveteur → compression → maintien → alerte. Si aucun tissu disponible, la paume de la main suffit.' },
 
             { type:'true-false', title:'Brûlure — durée de refroidissement',
               question:'Pour une brûlure, il suffit de refroidir la zone sous l\'eau froide pendant 5 minutes.',
@@ -702,7 +699,7 @@ let BOXES_DATA = [
               sentence:'En cas de brûlure, il faut refroidir sous l\'eau %1% pendant au minimum %2% minutes sans jamais retirer les vêtements collés.',
               correctBlanks:['tempérée','15'],
               wordBank:['tempérée','15','froide','5','chaude','30','tiède','10'],
-              explanation:'Eau tempérée (15-25°C), 15 minutes minimum. L\'eau trop froide peut aggraver les lésions et provoquer un choc thermique. 15 min est une durée minimale, pas maximale.' },
+              explanation:'Eau tempérée (15-25°C), 15 minutes minimum. L\'eau trop froide peut aggraver les lésions et provoquer un choc thermique.' },
 
             { type:'true-false', title:'Corps étranger dans une plaie',
               question:'En présence d\'un corps étranger planté dans une plaie, il faut le retirer avant d\'appliquer le pansement compressif.',
@@ -721,11 +718,10 @@ let BOXES_DATA = [
               question:'Quels gestes réalisez-vous ?',
               options:['Le laisser tousser, ça va passer','5 tapes dans le dos puis 5 compressions abdominales (Heimlich)','Donner immédiatement 30 compressions thoraciques','Appeler le 15 avant tout geste'],
               correctAnswer:1,
-              explanation:'L\'impossibilité de parler + de tousser = obstruction totale. Geste immédiat : 5 tapes dans le dos + 5 compressions abdominales. On alterne jusqu\'à désobstruction. On appelle le 15 si les gestes échouent.' }
+              explanation:'L\'impossibilité de parler + de tousser = obstruction totale. Geste immédiat : 5 tapes dans le dos + 5 compressions abdominales. On alterne jusqu\'à désobstruction.' }
         ]
     },
 
-    // ===== BOX 4 — RCP & DAE =====
     {
         title: 'RCP & DAE',
         subtitle: 'Réanimation cardiaque',
@@ -785,7 +781,7 @@ let BOXES_DATA = [
               sentence:'La RCP se réalise avec un rythme de %1% compressions thoraciques pour %2% insufflations, sans interruption.',
               correctBlanks:['30','2'],
               wordBank:['30','2','15','5','20','3','10','1'],
-              explanation:'30 compressions pour 2 insufflations = le rapport 30:2. C\'est le standard international pour l\'adulte. Pour les nourrissons : 30:2 également mais avec 2 doigts et un seuil de 4 cm.' },
+              explanation:'30 compressions pour 2 insufflations = le rapport 30:2. C\'est le standard international pour l\'adulte.' },
 
             { type:'true-false', title:'Arrêter la RCP',
               question:'On doit arrêter la RCP dès que la victime semble montrer de légères améliorations (grimace, mouvement).',
@@ -865,7 +861,7 @@ window.renderLogs = function() {
     if (lvl !== 'all') logs = logs.filter(l=>l.level===lvl);
     if (team !== 'all') logs = logs.filter(l=>l.team===team);
     const stats = document.getElementById('log-stats');
-    if (stats) { const counts={error:0,warn:0,success:0,info:0,debug:0}; _allLogs.forEach(l=>{if(counts[l.level]!==undefined)counts[l.level]++;}); stats.innerHTML=[`<span class="text-red-600">🔴 ${counts.error} erreurs</span>`,`<span class="text-orange-500">🟠 ${counts.warn} warnings</span>`,`<span class="text-green-600">🟢 ${counts.success} succès</span>`,`<span class="text-blue-500">🔵 ${counts.info} infos</span>`,`<span class="text-gray-500">Total : ${_allLogs.length}</span>`].join(' · '); }
+    if (stats) { const c={error:0,warn:0,success:0,info:0,debug:0}; _allLogs.forEach(l=>{if(c[l.level]!==undefined)c[l.level]++;}); stats.innerHTML=[`<span class="text-red-600">🔴 ${c.error} erreurs</span>`,`<span class="text-orange-500">🟠 ${c.warn} warnings</span>`,`<span class="text-green-600">🟢 ${c.success} succès</span>`,`<span class="text-blue-500">🔵 ${c.info} infos</span>`,`<span class="text-gray-500">Total : ${_allLogs.length}</span>`].join(' · '); }
     if (!logs.length) { container.innerHTML='<div class="text-gray-400 text-sm text-center py-8">Aucun log pour ces filtres</div>'; return; }
     container.innerHTML = [...logs].reverse().map(l => {
         const teamHtml = l.team ? `<span class="log-team">[${l.team}]</span>` : '';
@@ -904,7 +900,7 @@ function showScreenSafe(id) {
 }
 function goBackToDashboard() { showConfirmDialog('Revenir au Dashboard ?<br><small>La session reste active.</small>',()=>showScreenSafe('supervisor-dashboard')); }
 function traineeGoBack() {
-    showConfirmDialog('Quitter la session ?<br><small>Vous devrez vous reconnecter.</small>',()=>{
+    showConfirmDialog('Quitter la session ?<br><small>Vous pourrez vous reconnecter.</small>',()=>{
         fireLog('warn','DECONNEXION',`Retour volontaire — "${teamName||'?'}" a quitté la session`,{teamId});
         if(teamId&&sessionId&&database) database.ref('sessions/'+sessionId+'/teams/'+teamId+'/online').set(false);
         localStorage.removeItem('sstTraineeSession');
@@ -1184,10 +1180,24 @@ function displayRanking(containerId) {
     });
 }
 
+/* ===== PODIUM ===== */
 function showPodium() {
     showScreenSafe('podium-screen');
     database.ref('sessions/'+sessionId+'/gameStatus').set('finished');
     createConfetti();
+
+    // ✅ Boutons réservés au superviseur uniquement
+    const sb = document.getElementById('podium-supervisor-btns');
+    if (sb) {
+        if (userRole === 'supervisor') {
+            sb.classList.remove('hidden');
+            sb.classList.add('flex');
+        } else {
+            sb.classList.add('hidden');
+            sb.classList.remove('flex');
+        }
+    }
+
     database.ref('sessions/'+sessionId+'/teams').once('value',snap=>{
         const teams=snap.val(); if(!teams) return;
         const arr=Object.entries(teams).map(([id,t])=>({id,name:t?.name||'?',score:t?.score||0})).sort((a,b)=>b.score-a.score);
